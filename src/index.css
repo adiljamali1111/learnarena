@@ -1,0 +1,135 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;700;900&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "JetBrains Mono", ui-monospace, monospace;
+  --font-heading: "Orbitron", ui-sans-serif, sans-serif;
+  --color-dark-base: #0d0221;
+  --color-dark-surface: #150433;
+  --color-primary: #a855f7;
+  --color-primary-light: #c084fc;
+  --color-accent: #00f0ff;
+  --color-accent-dim: rgba(0, 240, 255, 0.3);
+  --color-foreground: #ffffff;
+  --color-muted: rgba(255, 255, 255, 0.6);
+  --color-muted-lighter: rgba(255, 255, 255, 0.4);
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-destructive: #ef4444;
+  --color-success: #22c55e;
+  --color-gold: #fbbf24;
+  --color-silver: #94a3b8;
+  --color-bronze: #d97706;
+  --color-orange: #f97316;
+}
+
+/* ---- Base ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, #0d0221 0%, #150433 30%, #1a0547 60%, #2d1b69 100%);
+  color: #ffffff;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  min-height: 100vh;
+}
+
+/* ---- Glass Card Utility ---- */
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  transition: all 200ms ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.1);
+}
+
+/* ---- Glow Effects ---- */
+.glow-cyan {
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.3), 0 0 30px rgba(0, 240, 255, 0.1);
+}
+
+.glow-purple {
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.3), 0 0 30px rgba(168, 85, 247, 0.1);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.2);
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.2);
+}
+
+/* ---- Skeleton Loading ---- */
+.skeleton-pulse {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ---- Animations ---- */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ---- Focus & Selection ---- */
+::selection {
+  background: rgba(168, 85, 247, 0.3);
+  color: #ffffff;
+}
+
+/* ---- Reduced Motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
