@@ -9,7 +9,6 @@ import {
   TabKey,
   APIProvider,
   XpState,
-  RecallCard,
   Notification,
 } from '../types';
 
@@ -45,7 +44,7 @@ function getInitialState(): DashboardState {
     activeNote: null,
     modules: [],
     recallCardsState: [],
-    seenQuestions: new Set(),
+    seenQuestions: new Set<string>(),
     xp: { level: 1, current: 0, totalForNextLevel: 100 },
     notifications: [],
     cumulativeXp: 0,
@@ -76,12 +75,28 @@ function dashboardReducer(state: DashboardState, action: DashboardAction): Dashb
     case 'ADD_MODULE':
       return { ...state, modules: [...state.modules, action.payload] };
 
+    case 'REMOVE_MODULE':
+      return {
+        ...state,
+        modules: state.modules.filter((m) => m.id !== action.payload),
+      };
+
     case 'UPDATE_MODULE_PROGRESS':
       return {
         ...state,
         modules: state.modules.map((m) =>
           m.id === action.payload.id ? { ...m, progress: action.payload.progress } : m,
         ),
+      };
+
+    case 'ADD_TOPIC_XP':
+      return {
+        ...state,
+        modules: state.modules.map((m) =>
+          m.id === action.payload.moduleId ? { ...m, xp: m.xp + action.payload.amount } : m,
+        ),
+        cumulativeXp: state.cumulativeXp + action.payload.amount,
+        xp: getCumulativeLevel(state.cumulativeXp + action.payload.amount),
       };
 
     case 'SET_RECALL_CARDS':

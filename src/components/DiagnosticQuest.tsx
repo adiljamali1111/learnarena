@@ -21,7 +21,7 @@ export default function DiagnosticQuest({ questions }: Props) {
   const question = questionPool[currentIndex];
 
   const refreshQuestions = useCallback(() => {
-    const unseen = questions.filter(q => !state.seenQuestions.includes(q.question));
+    const unseen = questions.filter(q => !state.seenQuestions.has(q.question));
     const shuffled = [...(unseen.length > 0 ? unseen : questions)].sort(() => Math.random() - 0.5);
     const freshPool = shuffled.slice(0, Math.max(5, Math.min(questions.length, 10)));
 

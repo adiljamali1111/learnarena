@@ -2,61 +2,103 @@
    LearnArena — File Parser Service
    ────────────────────────────────────────── */
 
-import { ParsedDocument } from '../types';
+export interface ParsedFile {
+  fileName: string;
+  text: string;
+  images: string[];
+  type: 'pdf' | 'txt' | 'md' | 'docx' | 'pptx';
+}
 
-/**
- * Parse a text file and extract its content.
- * In the browser, we read File objects via FileReader.
- */
-export async function parseFile(file: File): Promise<ParsedDocument> {
-  return new Promise((resolve, reject) => {
-    // Determine type from extension
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'txt';
-    const supportedTypes = ['txt', 'md', 'pdf', 'docx', 'pptx'] as const;
-    const type = supportedTypes.includes(ext as typeof supportedTypes[number])
-      ? (ext as ParsedDocument['type'])
-      : 'txt';
+export interface FileParseError {
+  fileName: string;
+  error: string;
+}
 
-    // For now, handle text-based files directly
-    if (type === 'txt' || type === 'md') {
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_FILES = 5;
+
+export const FILE_LIMITS = {
+  maxFiles: MAX_FILES,
+  maxSizeMB: 20,
+};
+
+export function validateFiles(files: File[]): { valid: File[]; errors: FileParseError[] } {
+  const valid: File[] = [];
+  const errors: FileParseError[] = [];
+
+  for (const file of files) {
+    // Check size
+    if (files.reduce((sum, f) => sum + f.size, 0) > MAX_FILE_SIZE) {
+      errors.push({ fileName: file.name, error: 'Total file size exceeds 20MB limit' });
+      continue;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      errors.push({ fileName: file.name, error: 'File exceeds 20MB size limit' });
+      continue;
+    }
+
+    // Check extension
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const supported = ['pdf', 'docx', 'pptx', 'txt', 'md'];
+    if (!ext || !supported.includes(ext)) {
+      errors.push({ fileName: file.name, error: `Unsupported file type: .${ext || 'unknown'}` });
+      continue;
+    }
+
+    valid.push(file);
+  }
+
+  // Limit total files
+  if (valid.length > MAX_FILES) {
+    const removed = valid.splice(MAX_FILES);
+    for (const f of removed) {
+      errors.push({ fileName: f.name, error: 'Exceeds maximum 5 files' });
+    }
+  }
+
+  return { valid, errors };
+}
+
+export async function parseFile(file: File): Promise<ParsedFile> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'txt';
+  const supported = ['pdf', 'docx', 'pptx', 'txt', 'md'];
+  const type = (supported.includes(ext) ? ext : 'txt') as ParsedFile['type'];
+
+  // Text-based files
+  if (type === 'txt' || type === 'md') {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        const content = reader.result as string;
         resolve({
-          title: file.name.replace(/\.\w+$/, ''),
-          content,
+          fileName: file.name,
+          text: reader.result as string,
+          images: [],
           type,
         });
       };
       reader.onerror = () => reject(new Error('Failed to read file'));
       reader.readAsText(file);
-      return;
-    }
+    });
+  }
 
-    // For PDF, DOCX, PPTX — we'd need heavier libraries
-    // For now, provide a graceful fallback
-    if (type === 'pdf') {
-      // In production, integrate pdf.js or similar
-      resolve({
-        title: file.name.replace(/\.pdf$/, ''),
-        content: `[PDF content from "${file.name}" — install pdf.js for full extraction]`,
-        type: 'pdf',
-        pageCount: 1,
-      });
-      return;
-    }
+  // For binary formats, return a descriptive placeholder
+  if (type === 'pdf') {
+    return {
+      fileName: file.name,
+      text: `[PDF content from "${file.name}" — install pdf.js for full text extraction]\n\nPDF binary content loaded (${(file.size / 1024).toFixed(1)} KB).`,
+      images: [],
+      type: 'pdf',
+    };
+  }
 
-    if (type === 'docx' || type === 'pptx') {
-      resolve({
-        title: file.name.replace(/\.\w+$/, ''),
-        content: `[Document content from "${file.name}" — install mammoth.js or similar for extraction]`,
-        type,
-      });
-      return;
-    }
+  if (type === 'docx' || type === 'pptx') {
+    return {
+      fileName: file.name,
+      text: `[Document content from "${file.name}" — install mammoth.js for full extraction]\n\nDocument loaded (${(file.size / 1024).toFixed(1)} KB).`,
+      images: [],
+      type,
+    };
+  }
 
-    reject(new Error(`Unsupported file type: ${type}`));
-  });
+  throw new Error(`Unsupported file type: ${type}`);
 }
-
-export type { ParsedDocument };

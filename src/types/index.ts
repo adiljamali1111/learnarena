@@ -3,12 +3,13 @@
    ────────────────────────────────────────── */
 
 // ── Tab / Navigation ──────────────────────
-export enum TabKey {
-  Dashboard = 'dashboard',
-  MyUniverse = 'my-universe',
-  PracticeDuel = 'practice-duel',
-  LearnersDen = 'learners-den',
-}
+export const TabKey = {
+  Dashboard: 'dashboard',
+  MyUniverse: 'my-universe',
+  PracticeDuel: 'practice-duel',
+  LearnersDen: 'learners-den',
+} as const;
+export type TabKey = (typeof TabKey)[keyof typeof TabKey];
 
 // ── API ───────────────────────────────────
 export type APIProvider = 'openrouter' | 'google' | 'anthropic';
@@ -49,13 +50,18 @@ export interface ContextGraphNode {
   label: string;
   emoji?: string;
   children?: ContextGraphNode[];
+  connections?: string[];
 }
+
+// Alias for ContextMap component
+export type ContextNode = ContextGraphNode;
 
 // ── Synthesis ────────────────────────────
 export interface SynthesisData {
   summary: string;
   keyTakeaways: string[];
   recommendedNext: string[];
+  audioTabs?: Array<{ title: string; url: string }>;
 }
 
 // ── Dashboard Data ────────────────────────
@@ -101,6 +107,41 @@ export interface NotesInputData {
   fileName?: string;
 }
 
+// ── Module Record (for MyUniverse) ────────
+export interface ModuleRecord {
+  id: string;
+  title: string;
+  emoji: string;
+  difficulty: string;
+  createdAt: number;
+  progress: number;
+  questionCount: number;
+  xp: number;
+}
+
+// ── Legacy module type (for old service files) ──
+export interface Module {
+  id: string;
+  title: string;
+  emoji: string;
+  description: string;
+  content: string;
+  concepts: CoreConcept[];
+  diagnosticQuestions: QuizQuestion[];
+  practiceQuestions: QuizQuestion[];
+  recallCards: RecallCard[];
+  createdAt: number;
+  xp: number;
+  mastery: number;
+  completed: boolean;
+}
+
+export interface GenerateModulesPayload {
+  notesText: string;
+  notesTitle: string;
+  provider: APIProvider;
+}
+
 // ── Dashboard State ───────────────────────
 export interface DashboardState {
   activeTab: TabKey;
@@ -117,17 +158,6 @@ export interface DashboardState {
   cumulativeXp: number;
 }
 
-export interface ModuleRecord {
-  id: string;
-  title: string;
-  emoji: string;
-  difficulty: string;
-  createdAt: number;
-  progress: number;
-  questionCount: number;
-  xp: number;
-}
-
 // ── Dashboard Actions ─────────────────────
 export type DashboardAction =
   | { type: 'SET_ACTIVE_TAB'; payload: TabKey }
@@ -137,10 +167,12 @@ export type DashboardAction =
   | { type: 'SET_GENERATING'; payload: boolean }
   | { type: 'SET_ACTIVE_NOTE'; payload: string | null }
   | { type: 'ADD_MODULE'; payload: ModuleRecord }
+  | { type: 'REMOVE_MODULE'; payload: string }
   | { type: 'UPDATE_MODULE_PROGRESS'; payload: { id: string; progress: number } }
   | { type: 'SET_RECALL_CARDS'; payload: RecallCard[] }
   | { type: 'UPDATE_RECALL_CARD'; payload: { id: string; known: boolean } }
   | { type: 'ADD_SEEN_QUESTION'; payload: string }
+  | { type: 'ADD_TOPIC_XP'; payload: { moduleId: string; amount: number } }
   | { type: 'ADD_XP'; payload: number }
   | { type: 'ADD_NOTIFICATION'; payload: { message: string; type: Notification['type'] } }
   | { type: 'MARK_NOTIFICATION_READ'; payload: string }

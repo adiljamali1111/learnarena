@@ -1,146 +1,140 @@
-import { useState, useCallback, useEffect } from 'react';
-import { FlipHorizontal, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+/* ──────────────────────────────────────────
+   LearnArena — Recall Cards
+   ────────────────────────────────────────── */
+
+import { useState, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, RotateCw, CheckCircle2, XCircle } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 
-export default function RecallCards({ onClose: _onClose }: { onClose?: () => void }) {
+export default function RecallCards() {
   const { state, dispatch } = useDashboard();
-  const cards = state.recallCards;
+  const cards = state.recallCardsState;
   const [current, setCurrent] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'known' | 'unknown'>('all');
 
-  useEffect(() => {
-    setFlipped(false);
-  }, [current]);
+  const filteredCards = useMemo(() => {
+    if (filter === 'known') return cards.filter((c) => c.known === true);
+    if (filter === 'unknown') return cards.filter((c) => c.known === null || c.known === false);
+    return cards;
+  }, [cards, filter]);
+
+  const currentCard = filteredCards[current];
+  const knownCount = cards.filter((c) => c.known === true).length;
+
+  const handleKnown = (known: boolean) => {
+    if (!currentCard) return;
+    dispatch({ type: 'UPDATE_RECALL_CARD', payload: { id: currentCard.id, known } });
+    if (current < filteredCards.length - 1) {
+      setTimeout(() => { setFlipped(false); setCurrent((p) => p + 1); }, 300);
+    }
+  };
 
   if (cards.length === 0) {
     return (
-      <div className="dark-glass rounded-xl p-6 text-center max-w-md mx-auto">
-        <div className="text-4xl mb-4">🃏</div>
-        <p className="text-text-secondary">No recall cards yet. Generate a module first.</p>
+      <div className="dark-glass rounded-xl p-8 text-center">
+        <div className="text-5xl mb-4">🃏</div>
+        <h3 className="font-heading text-lg text-text-primary mb-2">No Recall Cards Yet</h3>
+        <p className="text-text-muted text-sm max-w-md mx-auto">
+          Generate a study module first, and recall cards will appear here for you to review key concepts.
+        </p>
       </div>
     );
   }
 
-  const card = cards[current];
-  const known = Object.values(cards).filter((c) => c.known === true).length;
-  const total = cards.length;
-
-  const mark = useCallback((knownVal: boolean) => {
-    dispatch({ type: 'UPDATE_RECALL_CARD', payload: { id: card.id, known: knownVal } });
-  }, [dispatch, card.id]);
-
-  const goTo = useCallback((index: number, dir: 'left' | 'right') => {
-    if (isAnimating) return;
-    setSlideDir(dir);
-    setIsAnimating(true);
-    setFlipped(false);
-    setTimeout(() => {
-      setCurrent(index);
-      setSlideDir(null);
-      setIsAnimating(false);
-    }, 300);
-  }, [isAnimating]);
-
   return (
-    <div className="dark-glass rounded-xl p-6 max-w-lg mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <FlipHorizontal size={24} className="text-primary" />
-          <h2 className="font-heading text-xl text-text-primary">Recall Cards</h2>
-        </div>
-        <span className="text-text-muted text-xs">{known}/{total} known</span>
+    <div className="max-w-xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="font-heading text-xl text-text-primary">Recall Cards</h2>
+        <span className="text-text-muted text-sm">{knownCount}/{cards.length} mastered</span>
       </div>
 
-      {/* Progress */}
-      <div className="w-full h-1.5 bg-bg-elevated rounded-full mb-6 overflow-hidden">
-        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${((current + 1) / total) * 100}%` }} />
-      </div>
-
-      {/* Card container with 3D flip + slide */}
-      <div className="relative min-h-[220px]" style={{ perspective: '1000px' }}>
-        {/* Slide wrapper */}
-        <div
-          className={`transition-all duration-300 ease-in-out ${
-            slideDir === 'left' ? '-translate-x-full opacity-0 absolute inset-0' :
-            slideDir === 'right' ? 'translate-x-full opacity-0 absolute inset-0' :
-            'translate-x-0 opacity-100'
-          }`}
-        >
-          {/* 3D flip container */}
-          <div
-            className="cursor-pointer min-h-[220px]"
-            style={{ perspective: '1000px' }}
-            onClick={() => setFlipped(!flipped)}
+      {/* Filter tabs */}
+      <div className="flex gap-2 mb-6">
+        {(['all', 'unknown', 'known'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => { setFilter(f); setCurrent(0); setFlipped(false); }}
+            className={`text-xs px-3 py-1.5 rounded-full font-heading tracking-wider transition-all
+              ${filter === f ? 'bg-primary text-white' : 'glass-button-ghost'}`}
           >
-            <div
-              className="relative w-full min-h-[220px] transition-all duration-[600ms] ease-in-out"
-              style={{
-                transformStyle: 'preserve-3d',
-                transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-              }}
-            >
-              {/* Front */}
-              <div
-                className="dark-glass-hover rounded-xl p-6 text-center flex items-center justify-center absolute inset-0"
-                style={{ backfaceVisibility: 'hidden' }}
-              >
-                <div className="space-y-3">
-                  <div className="text-4xl">{card.emoji}</div>
-                  <h3 className="font-heading text-lg text-text-primary">{card.front}</h3>
-                  <p className="text-text-muted text-xs">Tap to reveal</p>
-                </div>
-              </div>
-
-              {/* Back */}
-              <div
-                className="dark-glass-hover rounded-xl p-6 text-center flex items-center justify-center absolute inset-0"
-                style={{
-                  backfaceVisibility: 'hidden',
-                  transform: 'rotateY(180deg)',
-                }}
-              >
-                <div className="space-y-3">
-                  <p className="text-text-secondary text-sm leading-relaxed">{card.back}</p>
-                  <p className="text-text-muted text-xs">Tap to flip back</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+            {f === 'all' ? 'All' : f === 'unknown' ? 'To Review' : 'Mastered'}
+          </button>
+        ))}
       </div>
 
-      {/* Actions */}
-      {flipped && (
-        <div className="flex items-center justify-center gap-4 mt-6 animate-fade-in">
-          <button onClick={() => mark(false)} className="glass-button-ghost px-5 py-3 rounded-lg flex items-center gap-2 text-sm text-danger">
-            <XCircle size={18} /> Don't Know
-          </button>
-          <button onClick={() => mark(true)} className="glass-button px-5 py-3 rounded-lg flex items-center gap-2 text-sm">
-            <CheckCircle size={18} /> Know
-          </button>
+      {/* Card */}
+      {currentCard ? (
+        <>
+          <div
+            onClick={() => setFlipped(!flipped)}
+            className="dark-glass rounded-xl p-8 min-h-[220px] flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:border-primary/30 mb-6"
+          >
+            {!flipped ? (
+              <div className="text-center space-y-4">
+                {currentCard.emoji && <div className="text-4xl">{currentCard.emoji}</div>}
+                <p className="text-text-primary text-lg font-heading">{currentCard.front}</p>
+                <p className="text-text-muted text-xs">Tap to reveal answer</p>
+              </div>
+            ) : (
+              <div className="text-center space-y-4 animate-fade-in">
+                <p className="text-accent text-base leading-relaxed">{currentCard.back}</p>
+                <div className="flex gap-3 justify-center pt-4">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleKnown(false); }}
+                    className="glass-button-ghost px-4 py-2 rounded-lg text-danger flex items-center gap-2 text-sm"
+                  >
+                    <XCircle size={16} /> Still Learning
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleKnown(true); }}
+                    className="glass-button px-4 py-2 rounded-lg flex items-center gap-2 text-sm"
+                  >
+                    <CheckCircle2 size={16} /> Got It
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => { setFlipped(false); setCurrent((p) => Math.max(0, p - 1)); }}
+              disabled={current === 0}
+              className="glass-button-ghost p-2 rounded-lg disabled:opacity-30"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="text-text-muted text-sm">
+              {current + 1} / {filteredCards.length}
+            </span>
+            <button
+              onClick={() => { setFlipped(false); setCurrent((p) => p + 1); }}
+              disabled={current === filteredCards.length - 1}
+              className="glass-button-ghost p-2 rounded-lg disabled:opacity-30"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          {/* Restart */}
+          {current === filteredCards.length - 1 && flipped && (
+            <div className="text-center mt-6">
+              <button
+                onClick={() => { setCurrent(0); setFlipped(false); }}
+                className="glass-button px-4 py-2 rounded-lg flex items-center gap-2 mx-auto text-sm"
+              >
+                <RotateCw size={16} /> Start Over
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="dark-glass rounded-xl p-8 text-center">
+          <p className="text-text-muted">No cards match this filter. Try a different filter or generate more cards.</p>
         </div>
       )}
-
-      {/* Nav */}
-      <div className="flex items-center justify-between mt-6">
-        <button
-          onClick={() => goTo(Math.max(0, current - 1), 'right')}
-          disabled={current === 0}
-          className="glass-button-ghost p-2 rounded-lg disabled:opacity-30"
-        >
-          <ChevronLeft size={18} />
-        </button>
-        <span className="text-text-muted text-xs">{current + 1} / {total}</span>
-        <button
-          onClick={() => goTo(Math.min(total - 1, current + 1), 'left')}
-          disabled={current === total - 1}
-          className="glass-button-ghost p-2 rounded-lg disabled:opacity-30"
-        >
-          <ChevronRight size={18} />
-        </button>
-      </div>
     </div>
   );
 }
