@@ -32,7 +32,6 @@ export default function AudioOverview() {
         <h2 className="font-heading text-xl text-text-primary">Audio Overview</h2>
       </div>
 
-      {/* Tab selector */}
       <div className="flex flex-wrap gap-2 mb-6">
         {tabs.map((tab, i) => (
           <button
@@ -50,12 +49,10 @@ export default function AudioOverview() {
         ))}
       </div>
 
-      {/* Content */}
       <div className="text-text-secondary text-sm leading-relaxed max-h-60 overflow-y-auto mb-6">
         {currentTab?.content}
       </div>
 
-      {/* Controls */}
       <div className="flex items-center justify-center gap-4">
         <button onClick={handlePlayPause} className="glass-button w-16 h-16 rounded-full flex items-center justify-center">
           {isPlaying ? <Pause size={24} /> : <Play size={24} />}

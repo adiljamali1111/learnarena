@@ -98,7 +98,6 @@ export default function NotesInputModal({ isOpen, onClose, onSubmit, onTryDemo, 
           </button>
         </div>
 
-        {/* Error banner */}
         {error && (
           <div className="mb-6 p-4 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm flex items-start gap-3">
             <AlertCircle size={18} className="mt-0.5 shrink-0" />
@@ -112,7 +111,6 @@ export default function NotesInputModal({ isOpen, onClose, onSubmit, onTryDemo, 
           </div>
         )}
 
-        {/* Text paste area */}
         <div className="mb-6">
           <label className="text-text-secondary text-sm mb-2 block">Paste your notes here</label>
           <textarea
@@ -124,14 +122,12 @@ export default function NotesInputModal({ isOpen, onClose, onSubmit, onTryDemo, 
           />
         </div>
 
-        {/* Divider */}
         <div className="flex items-center gap-4 mb-6">
           <div className="flex-1 h-px bg-border-glass" />
           <span className="text-text-muted text-xs font-heading">OR</span>
           <div className="flex-1 h-px bg-border-glass" />
         </div>
 
-        {/* File upload */}
         <div
           ref={dropRef}
           onDrop={handleDrop}
@@ -158,7 +154,6 @@ export default function NotesInputModal({ isOpen, onClose, onSubmit, onTryDemo, 
           />
         </div>
 
-        {/* File list */}
         {parsedFiles.length > 0 && (
           <div className="mt-4 space-y-2">
             {parsedFiles.map((pf, i) => (
@@ -182,7 +177,6 @@ export default function NotesInputModal({ isOpen, onClose, onSubmit, onTryDemo, 
           </div>
         )}
 
-        {/* Errors */}
         {errors.length > 0 && (
           <div className="mt-4 space-y-1">
             {errors.map((e, i) => (
@@ -194,7 +188,6 @@ export default function NotesInputModal({ isOpen, onClose, onSubmit, onTryDemo, 
           </div>
         )}
 
-        {/* Submit buttons */}
         <div className="flex flex-col sm:flex-row gap-3 mt-6">
           <button
             onClick={handleSubmit}

@@ -34,7 +34,6 @@ export default function MasteryProgress() {
         <p className="text-text-muted text-xs mt-1">Level {cumulativeLevel.level}</p>
       </div>
 
-      {/* XP Bar */}
       <div className="mb-4">
         <div className="flex justify-between text-xs text-text-muted mb-1">
           <span>Lv.{cumulativeLevel.level}</span>
@@ -51,7 +50,6 @@ export default function MasteryProgress() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="bg-bg-elevated rounded-lg p-2">
           <Zap size={16} className="mx-auto mb-1 text-warning" />

@@ -5,7 +5,6 @@ interface IntroPageProps {
 export default function IntroPage({ onStart }: IntroPageProps) {
   return (
     <div className="min-h-screen bg-nebula flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      {/* Decorative orbs */}
       <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-primary/10 blur-[100px] pointer-events-none" />
       <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-accent/8 blur-[120px] pointer-events-none" />
 

@@ -7,18 +7,17 @@ interface Props {
 }
 
 const GROUP_COLORS = [
-  '#a78bfa', // primary purple
-  '#60a5fa', // accent blue
-  '#34d399', // success green
-  '#fbbf24', // warning yellow
-  '#f472b6', // pink
-  '#fb923c', // orange
+  '#a78bfa',
+  '#60a5fa',
+  '#34d399',
+  '#fbbf24',
+  '#f472b6',
+  '#fb923c',
 ];
 
 export default function ContextMap({ nodes }: Props) {
   const [selected, setSelected] = React.useState<string | null>(null);
 
-  // Calculate positions in a circular layout
   const positions = useMemo(() => {
     const centerX = 150;
     const centerY = 150;
@@ -59,9 +58,7 @@ export default function ContextMap({ nodes }: Props) {
       </div>
 
       <div className="relative flex flex-col items-center">
-        {/* SVG Graph */}
         <svg viewBox="0 0 300 300" className="w-full max-w-[300px] h-auto">
-          {/* Connections */}
           {connections.map((c, i) => (
             <line
               key={i}
@@ -72,7 +69,6 @@ export default function ContextMap({ nodes }: Props) {
             />
           ))}
 
-          {/* Nodes */}
           {positions.map((node) => {
             const isSelected = selected === node.id;
             const color = GROUP_COLORS[node.group % GROUP_COLORS.length];
@@ -102,7 +98,6 @@ export default function ContextMap({ nodes }: Props) {
           })}
         </svg>
 
-        {/* Selection info */}
         {selectedNode && (
           <div className="mt-3 p-3 rounded-lg bg-bg-elevated w-full text-center animate-fade-in">
             <p className="text-text-primary text-sm font-bold mb-1">{selectedNode.label}</p>

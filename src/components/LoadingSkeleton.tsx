@@ -1,7 +1,6 @@
 export default function LoadingSkeleton() {
   return (
     <div className="min-h-screen bg-nebula p-6 space-y-6 animate-fade-in">
-      {/* Header skeleton */}
       <div className="flex items-center justify-between mb-8">
         <div className="space-y-2">
           <div className="skeleton h-8 w-48" />
@@ -10,14 +9,12 @@ export default function LoadingSkeleton() {
         <div className="skeleton h-10 w-40 rounded-lg" />
       </div>
 
-      {/* Tab skeleton */}
       <div className="flex gap-2 mb-8">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="skeleton h-10 w-28 rounded-lg" />
         ))}
       </div>
 
-      {/* Cards grid skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {[1, 2, 3, 4, 5, 6, 7].map((i) => (
           <div key={i} className="dark-glass rounded-xl p-5 space-y-4">
@@ -36,7 +33,6 @@ export default function LoadingSkeleton() {
         ))}
       </div>
 
-      {/* Status bar */}
       <div className="skeleton h-4 w-64 mx-auto mt-8" />
     </div>
   );

@@ -41,13 +41,11 @@ export default function ApiKeyModal({ isOpen, onSubmit, error, currentProvider }
   const [provider, setProvider] = useState<APIProvider>(currentProvider || 'openrouter');
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Reset key when provider changes
   useEffect(() => {
     setKey('');
     setShowKey(false);
   }, [provider]);
 
-  // Sync provider from parent when modal opens
   useEffect(() => {
     if (isOpen && currentProvider) {
       setProvider(currentProvider);
@@ -83,7 +81,6 @@ export default function ApiKeyModal({ isOpen, onSubmit, error, currentProvider }
           </div>
         )}
 
-        {/* Provider Selector Dropdown */}
         <div className="mb-4">
           <label className="block text-text-muted text-xs mb-2 font-heading tracking-wider">API PROVIDER</label>
           <div className="relative">

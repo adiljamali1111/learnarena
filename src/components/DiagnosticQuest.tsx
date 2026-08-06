@@ -21,12 +21,10 @@ export default function DiagnosticQuest({ questions }: Props) {
   const question = questionPool[currentIndex];
 
   const refreshQuestions = useCallback(() => {
-    // Create a fresh pool by shuffling and removing duplicates from seen questions
     const unseen = questions.filter(q => !state.seenQuestions.includes(q.question));
     const shuffled = [...(unseen.length > 0 ? unseen : questions)].sort(() => Math.random() - 0.5);
     const freshPool = shuffled.slice(0, Math.max(5, Math.min(questions.length, 10)));
 
-    // Ensure no overlap with previously used questions in this session
     const deduped = freshPool.filter(q => !usedIndices.has(questions.indexOf(q)));
     const finalPool = deduped.length >= 3 ? deduped : freshPool;
 
@@ -46,7 +44,6 @@ export default function DiagnosticQuest({ questions }: Props) {
 
     if (index === question.correctIndex) {
       setScore((prev) => prev + 1);
-      // Award 1 XP to current module for each correct answer
       const currentModule = state.modules[state.modules.length - 1];
       if (currentModule) {
         dispatch({ type: 'ADD_TOPIC_XP', payload: { moduleId: currentModule.id, amount: 1 } });
@@ -141,7 +138,6 @@ export default function DiagnosticQuest({ questions }: Props) {
         </div>
       </div>
 
-      {/* Progress */}
       <div className="w-full h-1.5 bg-bg-elevated rounded-full mb-4 overflow-hidden">
         <div
           className="h-full bg-primary rounded-full transition-all duration-300"
@@ -149,10 +145,8 @@ export default function DiagnosticQuest({ questions }: Props) {
         />
       </div>
 
-      {/* Question */}
       <p className="text-text-primary text-sm font-medium mb-4">{question.question}</p>
 
-      {/* Options */}
       <div className="space-y-2 mb-4">
         {question.options.map((opt, i) => {
           let borderClass = 'border-border-glass';
@@ -179,14 +173,12 @@ export default function DiagnosticQuest({ questions }: Props) {
         })}
       </div>
 
-      {/* Explanation */}
       {answered && (
         <div className="mb-4 p-3 rounded-lg bg-bg-elevated text-text-secondary text-xs leading-relaxed animate-fade-in">
           {question.explanation}
         </div>
       )}
 
-      {/* Next / See Results */}
       <button
         onClick={nextQuestion}
         disabled={!answered}
