@@ -1,154 +1,123 @@
-// ─── API Provider ───
-export type APIProvider = 'openrouter' | 'google';
+/* ──────────────────────────────────────────
+   LearnArena — Type Definitions
+   ────────────────────────────────────────── */
 
-// ─── Tab Navigation ───
-export const TabKey = {
-  Dashboard: 'dashboard',
-  MyUniverse: 'my-universe',
-  PracticeDuel: 'practice-duel',
-  LearnersDen: 'learners-den',
-} as const;
-export type TabKey = (typeof TabKey)[keyof typeof TabKey];
-
-// ─── OpenRouter Response ───
-export interface DashboardData {
-  moduleTitle: string;
-  moduleEmoji: string;
-  globalDifficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
-  synthesis: SynthesisData;
-  coreConcepts: CoreConcept[];
-  contextGraph: ContextNode[];
-  scenarios: Scenario[];
-  quiz: QuizQuestion[];
-  xpAwarded: number;
+// ── Tab / Navigation ──────────────────────
+export enum TabKey {
+  Dashboard = 'dashboard',
+  MyUniverse = 'my-universe',
+  PracticeDuel = 'practice-duel',
+  LearnersDen = 'learners-den',
 }
 
-// ─── ModuleSynthesis ───
-export interface SynthesisData {
-  summary: string;
-  audioTabs: AudioTab[];
-}
+// ── API ───────────────────────────────────
+export type APIProvider = 'openrouter' | 'google' | 'anthropic';
 
-export interface AudioTab {
-  title: string;
-  content: string;
-}
-
-// ─── CoreConceptDeck ───
+// ── Core Concept ──────────────────────────
 export interface CoreConcept {
   id: string;
   term: string;
-  definition: string;
   emoji: string;
+  definition: string;
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
-// ─── ContextMap ───
-export interface ContextNode {
-  id: string;
-  label: string;
-  description: string;
-  group: number;
-  connections: string[];
-}
-
-// ─── ScenarioSandbox / WhatIfLab ───
-export interface Scenario {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  exampleResponse: string;
-}
-
-// ─── DiagnosticQuest ───
+// ── Quiz / Diagnostic Question ────────────
 export interface QuizQuestion {
   id: string;
   question: string;
   options: string[];
   correctIndex: number;
   explanation: string;
-  topic: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  conceptId?: string;
 }
 
-// ─── Practice Duel ───
-export const DuelPhase = {
-  Idle: 'idle',
-  DifficultySelect: 'difficulty-select',
-  Preparing: 'preparing',
-  Playing: 'playing',
-  Done: 'done',
-} as const;
-export type DuelPhase = (typeof DuelPhase)[keyof typeof DuelPhase];
-
-export type DuelDifficulty = 'easy' | 'medium' | 'hard' | 'extreme';
-
-export interface DuelState {
-  phase: DuelPhase;
-  difficulty: DuelDifficulty;
-  lives: number;
-  score: number;
-  combo: number;
-  maxCombo: number;
-  currentQuestionIndex: number;
-  questions: QuizQuestion[];
-  correctAnswers: number;
-  wrongAnswers: number;
-  timeLeft: number;
-  rivalScore: number;
-  playerAnswered: boolean;
-  aiAnswered: boolean;
-  lastAnswerCorrect: boolean | null;
-  rivalChoice: number | null;
-}
-
-// ─── MasteryProgress ───
-export interface XPState {
-  current: number;
-  level: number;
-  totalForNextLevel: number;
-}
-
-// ─── RecallCards ───
+// ── Recall Card ───────────────────────────
 export interface RecallCard {
   id: string;
   front: string;
   back: string;
-  emoji: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  emoji?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
   known: boolean | null;
 }
 
-// ─── Learner's Den Tools ───
-export const DenToolId = {
-  AudioOverview: 'audio-overview',
-  MindMap: 'mind-map',
-  Presentation: 'presentation',
-  RecallCards: 'recall-cards',
-  VisualBreakdown: 'visual-breakdown',
-  StudyReport: 'study-report',
-  WhatIfLab: 'what-if-lab',
-} as const;
-export type DenToolId = (typeof DenToolId)[keyof typeof DenToolId];
-
-export interface DenTool {
-  id: DenToolId;
+// ── Context Graph Node ────────────────────
+export interface ContextGraphNode {
+  id: string;
   label: string;
-  icon: string;
-  description: string;
+  emoji?: string;
+  children?: ContextGraphNode[];
 }
 
-// ─── Notifications ───
+// ── Synthesis ────────────────────────────
+export interface SynthesisData {
+  summary: string;
+  keyTakeaways: string[];
+  recommendedNext: string[];
+}
+
+// ── Dashboard Data ────────────────────────
+export interface DashboardData {
+  moduleTitle: string;
+  moduleEmoji: string;
+  globalDifficulty: 'beginner' | 'intermediate' | 'advanced';
+  synthesis: SynthesisData;
+  contextGraph: ContextGraphNode[];
+  coreConcepts: CoreConcept[];
+  quiz: QuizQuestion[];
+  recallCards: RecallCard[];
+}
+
+// ── Notification ──────────────────────────
 export interface Notification {
   id: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-  timestamp: number;
+  type: 'success' | 'error' | 'warning' | 'info';
   read: boolean;
+  timestamp: number;
 }
 
-// ─── Module Storage ───
-export interface ModuleSummary {
+// ── XP State ─────────────────────────────
+export interface XpState {
+  level: number;
+  current: number;
+  totalForNextLevel: number;
+}
+
+// ── Parsed Document ──────────────────────
+export interface ParsedDocument {
+  title: string;
+  content: string;
+  type: 'pdf' | 'txt' | 'md' | 'docx' | 'pptx';
+  pageCount?: number;
+}
+
+// ── Notes Input ──────────────────────────
+export interface NotesInputData {
+  text: string;
+  images: string[];
+  fileName?: string;
+}
+
+// ── Dashboard State ───────────────────────
+export interface DashboardState {
+  activeTab: TabKey;
+  dashboard: DashboardData | null;
+  apiKey: string | null;
+  apiProvider: APIProvider;
+  isGenerating: boolean;
+  activeNote: string | null;
+  modules: ModuleRecord[];
+  recallCardsState: RecallCard[];
+  seenQuestions: Set<string>;
+  xp: XpState;
+  notifications: Notification[];
+  cumulativeXp: number;
+}
+
+export interface ModuleRecord {
   id: string;
   title: string;
   emoji: string;
@@ -156,47 +125,31 @@ export interface ModuleSummary {
   createdAt: number;
   progress: number;
   questionCount: number;
-  xp: number; // topic XP (0-400)
+  xp: number;
 }
 
-// ─── App State ───
-export interface AppState {
-  apiKey: string;
-  apiProvider: APIProvider;
-  activeTab: TabKey;
-  dashboard: DashboardData | null;
-  activeNote: string;
-  isGenerating: boolean;
-  modules: ModuleSummary[];
-  seenQuestions: string[];
-  duel: DuelState;
-  xp: XPState;
-  cumulativeXp: number;
-  recallCards: RecallCard[];
-  notifications: Notification[];
-}
-
-// ─── Actions ───
-export type AppAction =
+// ── Dashboard Actions ─────────────────────
+export type DashboardAction =
+  | { type: 'SET_ACTIVE_TAB'; payload: TabKey }
+  | { type: 'SET_DASHBOARD'; payload: DashboardData | null }
   | { type: 'SET_API_KEY'; payload: string }
   | { type: 'SET_API_PROVIDER'; payload: APIProvider }
-  | { type: 'SET_ACTIVE_TAB'; payload: TabKey }
-  | { type: 'SET_DASHBOARD'; payload: DashboardData }
-  | { type: 'SET_ACTIVE_NOTE'; payload: string }
   | { type: 'SET_GENERATING'; payload: boolean }
-  | { type: 'ADD_MODULE'; payload: ModuleSummary }
-  | { type: 'REMOVE_MODULE'; payload: string }
+  | { type: 'SET_ACTIVE_NOTE'; payload: string | null }
+  | { type: 'ADD_MODULE'; payload: ModuleRecord }
   | { type: 'UPDATE_MODULE_PROGRESS'; payload: { id: string; progress: number } }
-  | { type: 'SET_DUEL'; payload: Partial<DuelState> }
-  | { type: 'RESET_DUEL' }
-  | { type: 'ADD_SEEN_QUESTION'; payload: string }
-  | { type: 'SET_XP'; payload: XPState }
-  | { type: 'ADD_XP'; payload: number }
-  | { type: 'ADD_TOPIC_XP'; payload: { moduleId: string; amount: number } }
-  | { type: 'SET_CUMULATIVE_XP'; payload: number }
   | { type: 'SET_RECALL_CARDS'; payload: RecallCard[] }
   | { type: 'UPDATE_RECALL_CARD'; payload: { id: string; known: boolean } }
-  | { type: 'ADD_NOTIFICATION'; payload: Notification }
+  | { type: 'ADD_SEEN_QUESTION'; payload: string }
+  | { type: 'ADD_XP'; payload: number }
+  | { type: 'ADD_NOTIFICATION'; payload: { message: string; type: Notification['type'] } }
   | { type: 'MARK_NOTIFICATION_READ'; payload: string }
   | { type: 'CLEAR_NOTIFICATIONS' }
-  | { type: 'LOAD_STATE'; payload: Partial<AppState> };
+  | { type: 'RESET' };
+
+// ── AI Response ───────────────────────────
+export interface AIResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}

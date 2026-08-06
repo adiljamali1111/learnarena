@@ -1,272 +1,214 @@
-import { DashboardData } from '../types';
-import { OPENROUTER_ENDPOINT, OPENROUTER_MODEL, OPENROUTER_MAX_TOKENS, OPENROUTER_TEMPERATURE, APP_URL, APP_TITLE } from '../constants';
-import { fetchWithRetry } from './retryFetch';
+/* ──────────────────────────────────────────
+   LearnArena — OpenRouter AI Service
+   ────────────────────────────────────────── */
 
-const SYSTEM_PROMPT = `You are a study assistant that transforms raw lecture notes into structured learning material. Analyze the provided notes (text and images) and return a JSON object with this exact schema:
+import { retryFetch } from './retryFetch';
+import { AIResponse, Module, GenerateModulesPayload } from '../types';
 
-{
-  "moduleTitle": "Short module name",
-  "moduleEmoji": "One emoji representing the topic",
-  "globalDifficulty": "beginner|intermediate|advanced|expert",
-  "synthesis": {
-    "summary": "2-3 paragraph comprehensive summary of the module",
-    "audioTabs": [
-      { "title": "Overview", "content": "~200 word spoken-style overview paragraph" },
-      { "title": "Deep Dive", "content": "~200 word detailed explanation" },
-      { "title": "Key Takeaways", "content": "~150 word bullet-point-friendly summary" }
-    ]
-  },
-  "coreConcepts": [
-    {
-      "id": "cc-1",
-      "term": "Concept Name",
-      "definition": "Clear, concise definition",
-      "emoji": "relevant emoji",
-      "difficulty": "easy|medium|hard"
-    }
-  ],
-  "contextGraph": [
-    {
-      "id": "node-1",
-      "label": "Concept Label",
-      "description": "Brief description",
-      "group": 0,
-      "connections": ["node-2", "node-3"]
-    }
-  ],
-  "scenarios": [
-    {
-      "id": "sc-1",
-      "title": "Scenario Title",
-      "description": "Real-world application scenario",
-      "difficulty": "beginner|intermediate|advanced",
-      "exampleResponse": "A model answer or approach to this scenario"
-    }
-  ],
-  "quiz": [
-    {
-      "id": "q-1",
-      "question": "Multiple choice question",
-      "options": ["A", "B", "C", "D"],
-      "correctIndex": 0,
-      "explanation": "Why this answer is correct",
-      "topic": "Topic name"
-    }
-  ],
-  "xpAwarded": 50
+const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
+
+interface OpenRouterMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
 }
 
-Requirements:
-- Generate 8-12 coreConcepts with increasing difficulty
-- Generate 5-7 contextGraph nodes with meaningful connections
-- Generate 3-4 scenarios for application practice
-- Generate 8-12 quiz questions testing different levels of understanding
-- Make all content directly based on the provided notes
-- Use clear, student-friendly language
-- For images: analyze any provided diagrams or figures and incorporate their content into the concepts and context`;
+interface OpenRouterResponse {
+  choices: Array<{ message: { content: string } }>;
+}
 
-export async function generateDashboard(
+export async function generateModulesOpenRouter(
+  payload: GenerateModulesPayload,
   apiKey: string,
-  textContent: string,
-  images: string[] = []
-): Promise<DashboardData> {
-  const messages: any[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
-  ];
-
-  // Build content parts — text first, then images
-  const userContent: any[] = [
-    {
-      type: 'text',
-      text: `Transform these study notes into a structured learning dashboard:\n\n${textContent}`,
-    },
-  ];
-
-  // Add images as data URIs (only if we have them)
-  for (const imageData of images.slice(0, 10)) {
-    if (imageData.startsWith('data:')) {
-      userContent.push({
-        type: 'image_url',
-        image_url: { url: imageData, detail: 'low' },
-      });
-    }
-  }
-
-  messages.push({ role: 'user', content: userContent });
-
-  let response: Response;
+): Promise<AIResponse<Module[]>> {
   try {
-    response = await fetchWithRetry(OPENROUTER_ENDPOINT, {
+    const systemPrompt = buildSystemPrompt();
+    const userPrompt = buildModuleGenerationPrompt(payload.notesText, payload.notesTitle);
+
+    const messages: OpenRouterMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
+
+    const response = await retryFetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': APP_URL,
-        'X-OpenRouter-Title': APP_TITLE,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'LearnArena',
       },
       body: JSON.stringify({
-        model: OPENROUTER_MODEL,
+        model: 'openai/gpt-4o-mini',
         messages,
-        max_tokens: OPENROUTER_MAX_TOKENS,
-        temperature: OPENROUTER_TEMPERATURE,
-        response_format: { type: 'json_object' },
+        temperature: 0.7,
+        max_tokens: 4096,
       }),
     });
-  } catch (err: any) {
-    const errBody: string = err.responseBody || '';
-    let errorMessage = err.message || 'Request failed';
 
-    if (err.message?.includes('401')) {
-      errorMessage = 'Invalid API key. Please check your OpenRouter key and try again.';
-    } else if (err.message?.includes('402')) {
-      errorMessage = 'Insufficient credits on your OpenRouter account. Please top up.';
-    } else if (err.message?.includes('429')) {
-      errorMessage = 'Too many requests. Please wait a moment and try again.';
-    } else if (err.message?.includes('503') || err.message?.includes('502')) {
-      errorMessage = 'OpenRouter is temporarily busy. Please try again in a few seconds.';
-    } else if (/too many connections|maxconnectionserror/i.test(err.message)) {
-      errorMessage = 'OpenRouter connection limit reached. Waiting a moment before retrying...';
+    if (!response.ok) {
+      const errorBody = await response.text();
+      return { success: false, error: `OpenRouter error (${response.status}): ${errorBody}` };
     }
 
-    try {
-      const parsed = JSON.parse(errBody);
-      if (parsed.error?.message) {
-        errorMessage += `: ${parsed.error.message}`;
-      }
-    } catch {}
-
-    throw new Error(errorMessage);
-  }
-
-  const data = await response.json();
-
-  if (!data.choices?.[0]?.message?.content) {
-    throw new Error('No valid response from OpenRouter. Please try again.');
-  }
-
-  const rawContent = data.choices[0].message.content;
-
-  try {
-    const parsed = JSON.parse(rawContent);
-    return parsed as DashboardData;
-  } catch {
-    throw new Error('Failed to parse the structured response. Please try again.');
+    const data: OpenRouterResponse = await response.json();
+    const parsed = parseModuleResponse(data.choices[0].message.content);
+    return { success: true, data: parsed };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
 
-export async function generateDuelQuestions(
+export async function generateContentOpenRouter(
+  systemPrompt: string,
+  userPrompt: string,
   apiKey: string,
-  moduleTitle: string,
-  synthesisSummary: string,
-  coreConcepts: string,
-  seenQuestions: string[],
-  totalQuestions: number = 10
-): Promise<Array<{ question: string; options: string[]; correctIndex: number; explanation: string }>> {
-  // Limit seen questions to keep prompt short
-  const recentSeen = seenQuestions.slice(-20);
-
-  const prompt = `Generate ${totalQuestions} challenging multiple-choice questions for the module "${moduleTitle}".
-
-Module Context:
-${synthesisSummary.slice(0, 1500)}
-
-Key Concepts:
-${coreConcepts.slice(0, 2000)}
-
-Seen Questions (DO NOT repeat any of these):
-${recentSeen.join('\n')}
-
-Return a JSON object with a "questions" key containing an array of exactly ${totalQuestions} question objects.
-Each question object must have: { "question": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "..." }
-Make each question distinct, testing different aspects of the material.`;
-
-  let response: Response;
+): Promise<AIResponse<string>> {
   try {
-    response = await fetchWithRetry(OPENROUTER_ENDPOINT, {
+    const messages: OpenRouterMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
+
+    const response = await retryFetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': APP_URL,
-        'X-OpenRouter-Title': APP_TITLE,
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'LearnArena',
       },
       body: JSON.stringify({
-        model: OPENROUTER_MODEL,
-        messages: [{ role: 'user', content: prompt }],
+        model: 'openai/gpt-4o-mini',
+        messages,
+        temperature: 0.7,
         max_tokens: 4096,
-        temperature: 0.5,
-        response_format: { type: 'json_object' },
       }),
     });
-  } catch (err: any) {
-    if (err.message?.includes('402')) {
-      throw new Error('Insufficient OpenRouter credits. Please top up.');
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      return { success: false, error: `OpenRouter error (${response.status}): ${errorBody}` };
     }
-    if (err.message?.includes('401')) {
-      throw new Error('Invalid API key. Please check your OpenRouter key.');
-    }
-    const errBody = err.responseBody || '';
-    let msg = err.message || 'API request failed';
-    try {
-      const parsed = JSON.parse(errBody);
-      if (parsed.error?.message) msg += `: ${parsed.error.message}`;
-    } catch {}
-    throw new Error(msg);
+
+    const data: OpenRouterResponse = await response.json();
+    return { success: true, data: data.choices[0].message.content };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
-
-  const data = await response.json();
-  if (!data.choices?.[0]?.message?.content) {
-    throw new Error('Empty response from OpenRouter');
-  }
-
-  const parsed = JSON.parse(data.choices[0].message.content);
-  const questions = parsed.questions || [];
-
-  if (!Array.isArray(questions) || questions.length === 0) {
-    throw new Error('No questions in the response');
-  }
-
-  const valid = questions.every(
-    (q: any) => q.question && Array.isArray(q.options) && q.options.length >= 2 && typeof q.correctIndex === 'number'
-  );
-  if (!valid) {
-    throw new Error('Response contained malformed questions');
-  }
-
-  return questions.slice(0, totalQuestions);
 }
 
-export async function generateChatResponse(
-  apiKey: string,
-  moduleTitle: string,
-  synthesisSummary: string,
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>
-): Promise<string> {
-  const systemMsg = `You are a helpful study tutor for the module "${moduleTitle}". 
-Module summary: ${synthesisSummary}
+// ── Helpers ───────────────────────────────
+function buildSystemPrompt(): string {
+  return `You are LearnArena, an expert educational content designer. Your job is to analyze study notes and create structured learning modules.
 
-Answer questions clearly and concisely. Be encouraging and help the student understand the material.`;
+Always respond with valid JSON. Never include markdown fences or commentary.
 
-  const response = await fetchWithRetry(OPENROUTER_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': APP_URL,
-      'X-OpenRouter-Title': APP_TITLE,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      messages: [
-        { role: 'system', content: systemMsg },
-        ...messages,
+You create modules, each with:
+- An emoji that represents the topic
+- A clear title
+- A brief description
+- Core concepts (term, emoji, definition, difficulty: easy/medium/hard)
+- Diagnostic questions (multiple choice with 4 options, correct index, explanation)
+- Practice duel questions (multiple choice with difficulty)
+- Recall card pairs (front question, back answer)
+
+Be concise, accurate, and pedagogically sound.`;
+}
+
+function buildModuleGenerationPrompt(notes: string, title: string): string {
+  const truncated = notes.length > 8000 ? notes.slice(0, 8000) + '...(truncated)' : notes;
+  return `Analyze these study notes titled "${title}" and create 3-5 learning modules.
+
+Notes:
+${truncated}
+
+Respond with this exact JSON structure:
+{
+  "modules": [
+    {
+      "title": "Module Title",
+      "emoji": "📚",
+      "description": "Brief description of what this module covers",
+      "concepts": [
+        { "term": "Concept Name", "emoji": "🔑", "definition": "Clear, concise definition", "difficulty": "easy" }
       ],
-      max_tokens: 1024,
-      temperature: 0.7,
-    }),
-  });
+      "diagnosticQuestions": [
+        {
+          "question": "What is...?",
+          "options": ["A", "B", "C", "D"],
+          "correctIndex": 0,
+          "explanation": "Because...",
+          "conceptId": "references the concept by term (we'll link later)"
+        }
+      ],
+      "practiceQuestions": [
+        {
+          "question": "Apply the concept...",
+          "options": ["A", "B", "C", "D"],
+          "correctIndex": 1,
+          "explanation": "The correct answer is...",
+          "difficulty": "medium"
+        }
+      ],
+      "recallCards": [
+        { "front": "What is X?", "back": "X is..." }
+      ]
+    }
+  ]
+}`;
+}
 
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || 'No response generated.';
+function parseModuleResponse(content: string): Module[] {
+  // Try to extract JSON from the response
+  let jsonStr = content.trim();
+
+  // Strip markdown fences if present
+  if (jsonStr.startsWith('```')) {
+    jsonStr = jsonStr.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
+  }
+
+  const parsed = JSON.parse(jsonStr);
+  const modulesData: any[] = parsed.modules || [];
+
+  return modulesData.map((mod: any, index: number) => ({
+    id: `mod-${Date.now()}-${index}`,
+    title: mod.title || 'Untitled Module',
+    emoji: mod.emoji || '📚',
+    description: mod.description || '',
+    content: '',
+    concepts: (mod.concepts || []).map((c: any, ci: number) => ({
+      id: `concept-${Date.now()}-${index}-${ci}`,
+      term: c.term,
+      emoji: c.emoji || '💡',
+      definition: c.definition,
+      difficulty: c.difficulty || 'medium',
+      moduleId: `mod-${Date.now()}-${index}`,
+    })),
+    diagnosticQuestions: (mod.diagnosticQuestions || []).map((q: any, qi: number) => ({
+      id: `dq-${Date.now()}-${index}-${qi}`,
+      question: q.question,
+      options: q.options,
+      correctIndex: q.correctIndex,
+      explanation: q.explanation,
+      conceptId: q.conceptId || '',
+    })),
+    practiceQuestions: (mod.practiceQuestions || []).map((q: any, qi: number) => ({
+      id: `pq-${Date.now()}-${index}-${qi}`,
+      question: q.question,
+      options: q.options,
+      correctIndex: q.correctIndex,
+      explanation: q.explanation,
+      difficulty: q.difficulty || 'medium',
+    })),
+    recallCards: (mod.recallCards || []).map((rc: any, rci: number) => ({
+      id: `rc-${Date.now()}-${index}-${rci}`,
+      front: rc.front,
+      back: rc.back,
+      moduleId: `mod-${Date.now()}-${index}`,
+    })),
+    createdAt: Date.now(),
+    xp: 0,
+    mastery: 0,
+    completed: false,
+  }));
 }

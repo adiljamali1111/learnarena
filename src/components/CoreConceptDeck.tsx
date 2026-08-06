@@ -49,6 +49,7 @@ export default function CoreConceptDeck({ concepts }: Props) {
         </span>
       </div>
 
+      {/* Progress bar */}
       <div className="w-full h-1.5 bg-bg-elevated rounded-full mb-4 overflow-hidden">
         <div
           className="h-full bg-gradient-to-r from-accent to-primary rounded-full transition-all duration-300"
@@ -56,6 +57,7 @@ export default function CoreConceptDeck({ concepts }: Props) {
         />
       </div>
 
+      {/* Card */}
       <div
         className="relative cursor-pointer min-h-[180px]"
         onClick={() => setFlipped(!flipped)}
@@ -84,6 +86,7 @@ export default function CoreConceptDeck({ concepts }: Props) {
         </div>
       </div>
 
+      {/* Controls */}
       <div className="flex items-center justify-between mt-4 gap-2">
         <button onClick={prev} disabled={current === 0} className="glass-button-ghost p-2 rounded-lg disabled:opacity-30">
           <ChevronLeft size={18} />
