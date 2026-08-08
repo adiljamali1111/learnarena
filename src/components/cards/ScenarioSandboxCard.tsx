@@ -1,83 +1,99 @@
 import { useState } from 'react';
-import { Target, RefreshCw } from 'lucide-react';
-import type { ScenarioCard } from '../../types/dashboard';
+import { FlaskConical, CheckCircle2, XCircle } from 'lucide-react';
+import type { Scenario } from '../../types/dashboard';
 
 interface Props {
-  data: ScenarioCard;
+  data: Scenario;
+  onComplete?: (correct: boolean) => void;
 }
 
-export default function ScenarioSandboxCard({ data }: Props) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ correct: boolean; explanation: string } | null>(null);
+export default function ScenarioSandboxCard({ data, onComplete }: Props) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [isRevealed, setIsRevealed] = useState(false);
 
-  const handleSelect = (id: string) => {
-    setSelectedId(id);
-    setFeedback({
-      correct: id === data.correctId,
-      explanation: data.explanation,
-    });
+  const handleSelect = (optionId: string) => {
+    if (isRevealed) return;
+    setSelected(optionId);
+    setIsRevealed(true);
+
+    const option = data.options.find((o) => o.id === optionId);
+    if (option && onComplete) {
+      onComplete(option.isCorrect);
+    }
   };
 
   const handleReset = () => {
-    setSelectedId(null);
-    setFeedback(null);
+    setSelected(null);
+    setIsRevealed(false);
   };
 
+  const selectedOption = data.options.find((o) => o.id === selected);
+
   return (
-    <div className="glass-card p-5 animate-fade-in-up">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Target className="w-5 h-5 text-accent" />
-          <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Scenario Sandbox</h3>
+    <div className="glass-card p-6 flex flex-col">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-warning/20 flex items-center justify-center">
+          <FlaskConical size={18} className="text-warning" />
         </div>
-        {feedback && (
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors cursor-pointer"
-          >
-            <RefreshCw className="w-3 h-3" /> Try Another
-          </button>
-        )}
+        <h3 className="font-heading font-semibold text-lg">Scenario Sandbox</h3>
       </div>
 
-      <div className="bg-dark-elevated/60 border border-border rounded-xl p-4 mb-4">
-        <p className="text-sm text-foreground leading-relaxed">{data.scenario}</p>
-      </div>
+      <h4 className="text-sm font-semibold text-glow-cyan mb-2">{data.title}</h4>
+      <p className="text-sm text-muted leading-relaxed mb-4">{data.context}</p>
 
-      <div className="space-y-2">
-        {data.options.map((opt) => {
-          const isSelected = selectedId === opt.id;
-          const isCorrect = opt.id === data.correctId;
-          let btnClass = 'bg-dark-elevated/60 border-border hover:border-primary/40';
+      <div className="flex-1 space-y-2">
+        {data.options.map((option) => {
+          const isSelected = selected === option.id;
+          const isCorrectOption = option.isCorrect;
+          let borderClass = 'border-glass-border hover:border-accent/40';
 
-          if (feedback) {
-            if (isCorrect) btnClass = 'border-success bg-success/10';
-            else if (isSelected) btnClass = 'border-destructive bg-destructive/10';
+          if (isRevealed && isSelected) {
+            borderClass = isCorrectOption
+              ? 'border-success bg-success/10'
+              : 'border-destructive bg-destructive/10';
+          } else if (isRevealed && isCorrectOption) {
+            borderClass = 'border-success/40 bg-success/5';
+          } else if (isSelected) {
+            borderClass = 'border-accent bg-accent/10';
           }
 
           return (
             <button
-              key={opt.id}
-              onClick={() => !feedback && handleSelect(opt.id)}
-              disabled={!!feedback}
-              className={`w-full text-left px-4 py-3 rounded-xl border text-sm text-foreground transition-all duration-200 cursor-pointer disabled:cursor-default ${btnClass}`}
+              key={option.id}
+              onClick={() => handleSelect(option.id)}
+              disabled={isRevealed}
+              className={`w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer disabled:cursor-default ${borderClass}`}
             >
-              <span className="text-muted-lighter mr-2">{String.fromCharCode(65 + data.options.indexOf(opt))}.</span>
-              {opt.text}
+              <div className="flex items-start gap-2">
+                {isRevealed && isCorrectOption && (
+                  <CheckCircle2 size={16} className="text-success mt-0.5 shrink-0" />
+                )}
+                {isRevealed && isSelected && !isCorrectOption && (
+                  <XCircle size={16} className="text-destructive mt-0.5 shrink-0" />
+                )}
+                <span className="text-sm text-foreground/80">{option.text}</span>
+              </div>
             </button>
           );
         })}
       </div>
 
-      {feedback && (
-        <div className={`mt-4 p-3 rounded-xl text-sm ${
-          feedback.correct ? 'bg-success/10 border border-success/30' : 'bg-destructive/10 border border-destructive/30'
-        }`}>
-          <p className={`font-bold mb-1 ${feedback.correct ? 'text-success' : 'text-destructive'}`}>
-            {feedback.correct ? '✓ Correct!' : '✗ Not quite.'}
-          </p>
-          <p className="text-muted leading-relaxed">{feedback.explanation}</p>
+      {/* Explanation */}
+      {isRevealed && selectedOption && (
+        <div className="mt-4 glass-card p-3 bg-accent/5 border-accent/20 animate-fade-in-up">
+          <p className="text-xs text-muted-lighter mb-1">Explanation</p>
+          <p className="text-sm text-foreground/80">{selectedOption.explanation}</p>
         </div>
+      )}
+
+      {/* Retry */}
+      {isRevealed && (
+        <button
+          onClick={handleReset}
+          className="mt-4 text-xs text-accent hover:text-accent/80 transition-colors self-start cursor-pointer"
+        >
+          Try again →
+        </button>
       )}
     </div>
   );

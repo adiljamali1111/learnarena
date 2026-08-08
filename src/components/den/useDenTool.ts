@@ -1,66 +1,96 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { generateDenContent, OpenRouterError } from '../../services/openrouter';
+import { useDashboard } from '../../context/DashboardContext';
 
-export function useDenTool<T>(
-  generator: () => Promise<T>,
-  cacheKey: string,
-): {
+const CACHE_PREFIX = 'learnarena_den_cache_';
+
+interface UseDenToolResult<T> {
   data: T | null;
-  loading: boolean;
+  isLoading: boolean;
   error: string | null;
-  generating: boolean;
-  regenerate: () => Promise<void>;
-} {
+  regenerate: () => void;
+}
+
+export function useDenTool<T>(toolKey: string): UseDenToolResult<T> {
+  const { state } = useDashboard();
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
+
+  const activeModule = state.modules.find(
+    (m) => m.id === state.activeModuleId,
+  );
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await generator();
-      setData(result);
-      // Cache in localStorage
-      try {
-        localStorage.setItem(`learnarena_den_${cacheKey}`, JSON.stringify(result));
-      } catch { /* storage full — ignore */ }
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to load');
-      setData(null);
-    } finally {
-      setLoading(false);
+    if (!activeModule || !state.apiKey) {
+      setError('No module or API key');
+      setIsLoading(false);
+      return;
     }
-  }, [generator, cacheKey]);
 
-  const regenerate = useCallback(async () => {
-    setGenerating(true);
-    setError(null);
+    // Check cache
+    const cacheKey = `${CACHE_PREFIX}${toolKey}_${activeModule.id}`;
     try {
-      const result = await generator();
-      setData(result);
-      try {
-        localStorage.setItem(`learnarena_den_${cacheKey}`, JSON.stringify(result));
-      } catch { /* ignore */ }
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to regenerate');
-    } finally {
-      setGenerating(false);
-    }
-  }, [generator, cacheKey]);
-
-  // Check local cache first
-  useEffect(() => {
-    try {
-      const cached = localStorage.getItem(`learnarena_den_${cacheKey}`);
+      const cached = localStorage.getItem(cacheKey);
       if (cached) {
-        setData(JSON.parse(cached));
-        setLoading(false);
+        const parsed = JSON.parse(cached);
+        setData(parsed);
+        setIsLoading(false);
         return;
       }
-    } catch { /* ignore */ }
-    load();
-  }, [cacheKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    } catch {
+      // ignore cache
+    }
 
-  return { data, loading, error, generating, regenerate };
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const content = await generateDenContent<T>(
+        state.apiKey,
+        toolKey,
+        activeModule.notes,
+      );
+      // Cache it
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(content));
+      } catch {
+        // cache may be full
+      }
+      setData(content);
+    } catch (err) {
+      const msg =
+        err instanceof OpenRouterError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to generate content';
+
+      // Retry once
+      try {
+        const content = await generateDenContent<T>(
+          state.apiKey,
+          toolKey,
+          activeModule.notes,
+        );
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(content));
+        } catch {
+          // ignore
+        }
+        setData(content);
+        setError(null);
+      } catch {
+        setError(msg);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeModule, state.apiKey, toolKey]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return { data, isLoading, error, regenerate: load };
 }

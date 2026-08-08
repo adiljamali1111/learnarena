@@ -1,67 +1,79 @@
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Loader2 } from 'lucide-react';
+import { useDashboard } from '../../context/DashboardContext';
+import { DEN_TOOLS, type DenToolKey } from '../../types/dashboard';
 
 interface Props {
-  title: string;
-  loading: boolean;
+  toolKey: DenToolKey;
+  isLoading: boolean;
   error: string | null;
-  generating: boolean;
-  onBack: () => void;
   onRegenerate: () => void;
   children: React.ReactNode;
 }
 
-export default function DenToolShell({ title, loading, error, generating, onBack, onRegenerate, children }: Props) {
+export default function DenToolShell({
+  toolKey,
+  isLoading,
+  error,
+  onRegenerate,
+  children,
+}: Props) {
+  const { closeDenTool } = useDashboard();
+  const toolInfo = DEN_TOOLS.find((t) => t.key === toolKey);
+
   return (
-    <div className="flex-1 flex flex-col p-4 overflow-y-auto">
-      <div className="max-w-4xl mx-auto w-full space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Den
-          </button>
+    <div className="p-4 max-w-4xl mx-auto min-h-[60vh]">
+      {/* Top bar */}
+      <div className="flex items-center gap-3 mb-4">
+        <button
+          onClick={closeDenTool}
+          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+          aria-label="Back"
+        >
+          <ArrowLeft size={18} className="text-muted" />
+        </button>
+
+        {toolInfo && (
+          <>
+            <span className="text-2xl">{toolInfo.icon}</span>
+            <div className="flex-1">
+              <h2 className="font-heading font-semibold text-lg">{toolInfo.title}</h2>
+              <p className="text-xs text-muted">{toolInfo.description}</p>
+            </div>
+          </>
+        )}
+
+        <button
+          onClick={onRegenerate}
+          disabled={isLoading}
+          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-40 cursor-pointer"
+          title="Regenerate"
+        >
+          <RefreshCw
+            size={16}
+            className={`text-muted ${isLoading ? 'animate-spin' : ''}`}
+          />
+        </button>
+      </div>
+
+      {/* Content */}
+      {isLoading ? (
+        <div className="glass-card p-12 flex flex-col items-center justify-center">
+          <Loader2 size={32} className="text-accent animate-spin mb-3" />
+          <p className="text-sm text-muted">Generating {toolInfo?.title || 'content'}...</p>
+        </div>
+      ) : error ? (
+        <div className="glass-card p-12 text-center">
+          <p className="text-destructive text-sm mb-3">{error}</p>
           <button
             onClick={onRegenerate}
-            disabled={generating}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-hover text-muted hover:text-foreground text-xs transition-colors cursor-pointer disabled:opacity-40"
+            className="btn-base px-4 py-2 rounded-xl bg-primary text-white text-sm hover:shadow-glow-purple transition-all cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
-            {generating ? 'Generating...' : 'Regenerate'}
+            Try Again
           </button>
         </div>
-
-        {/* Title */}
-        <h2 className="font-heading text-xl font-bold text-foreground">{title}</h2>
-
-        {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-muted">Loading...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="glass-card p-6 text-center">
-            <p className="text-sm text-destructive mb-2">{error}</p>
-            <button
-              onClick={onRegenerate}
-              disabled={generating}
-              className="px-4 py-2 rounded-xl bg-primary text-dark-base text-xs font-heading font-bold hover:bg-primary-light transition-colors cursor-pointer"
-            >
-              TRY AGAIN
-            </button>
-          </div>
-        )}
-
-        {/* Content */}
-        {!loading && !error && children}
-      </div>
+      ) : (
+        <div className="animate-fade-in-up">{children}</div>
+      )}
     </div>
   );
 }

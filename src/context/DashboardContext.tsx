@@ -1,487 +1,619 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import toast from 'react-hot-toast';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from 'react';
 import type {
+  AppState,
+  ModuleData,
   TabKey,
-  DashboardData,
-  SavedModule,
-  AppNotification,
+  ModalType,
   DuelState,
   DuelQuestion,
-  DuelResult,
+  Notification,
+  DenToolKey,
+  DashboardData,
+  DocumentImage,
 } from '../types/dashboard';
-import { generateDashboard, generateFreshQuestions, generateDenContent, OpenRouterError } from '../services/openrouter';
-import { validateFiles, parseFile } from '../services/fileParser';
-import { setDocumentImages, getDocumentImages } from '../services/documentContext';
-import { getSeenQuestions, markManySeen, clearSeenQuestions } from '../services/questionBank';
+import { getComboMultiplier, getComboLevel } from '../types/dashboard';
+import { generateDashboard, generateFreshQuestions, generateDenContent } from '../services/openrouter';
+import { parseMultipleFiles } from '../services/fileParser';
+import {
+  isQuestionSeen,
+  markQuestionSeen,
+  getUnseenQuestionIds,
+  clearSeenForModule,
+} from '../services/questionBank';
+import { getDocumentImages, clearDocumentImages } from '../services/documentContext';
 
-// ── Storage keys ──
-const DASHBOARD_KEY = 'learnarena_dashboard';
-const SAVED_MODULES_KEY = 'learnarena_saved_modules';
-const NOTIFICATIONS_KEY = 'learnarena_notifications';
-const HAS_ENTERED_KEY = 'learnarena_has_entered';
-const XP_KEY = 'learnarena_xp';
-const XP_FOR_DUEL = 200;
+/* ===========================
+   Constants
+   =========================== */
+const STORAGE_KEY = 'learnarena_state';
+const API_KEY_KEY = 'learnarena_openrouter_key';
+const HIGH_SCORE_KEY = 'learnarena_high_score';
 
-// ── Context shape ──
+const INITIAL_DUEL: DuelState = {
+  phase: 'idle',
+  questions: [],
+  currentIndex: 0,
+  playerScore: 0,
+  rivalScore: 0,
+  playerLives: 3,
+  combo: 0,
+  comboLevel: 0,
+  timeLeft: 15,
+  hasShield: false,
+  isAnswered: false,
+  selectedAnswer: null,
+  highScore: 0,
+  hintOpen: false,
+};
 
+const DUEL_TIME_LIMIT = 15;
+const DUEL_RIVAL_ACCURACY = 0.65;
+
+/* ===========================
+   Context
+   =========================== */
 interface DashboardContextValue {
-  // Auth / entry
-  hasEntered: boolean;
-  setHasEntered: (v: boolean) => void;
-  apiKey: string | null;
+  state: AppState;
+  setActiveTab: (tab: TabKey) => void;
+  setModal: (modal: ModalType) => void;
   setApiKey: (key: string) => void;
-
-  // Active dashboard
-  dashboardData: DashboardData | null;
-  isLoading: boolean;
-  error: string | null;
-  generateFromNotes: (notes: string) => Promise<void>;
-  generateFromFiles: (files: File[]) => Promise<void>;
+  generateFromNotes: (notes: string, files?: File[]) => Promise<void>;
   resetDashboard: () => void;
-  exportDashboard: () => void;
-
-  // Saved modules
-  savedModules: SavedModule[];
-  saveModule: (title: string) => void;
-  loadModule: (id: string) => void;
-  deleteModule: (id: string) => void;
-
-  // XP system
-  totalXp: number;
+  saveCurrentModule: () => void;
+  loadModule: (moduleId: string) => void;
+  deleteModule: (moduleId: string) => void;
   addXp: (amount: number) => void;
-
-  // Notifications
-  notifications: AppNotification[];
-  addNotification: (type: AppNotification['type'], title: string, body: string) => void;
-  markNotificationRead: (id: string) => void;
+  addNotification: (n: Omit<Notification, 'id' | 'timestamp'>) => void;
   clearNotifications: () => void;
-  unreadCount: number;
-
-  // Duel state
-  duel: DuelState;
+  markNotificationRead: (id: string) => void;
+  // Duel actions
   startDuel: () => Promise<void>;
-  answerDuelQuestion: (selectedIndex: number) => void;
+  answerDuelQuestion: (index: number) => void;
+  nextDuelQuestion: () => void;
+  tickDuelTimer: () => void;
+  closeDuelHint: () => void;
   resetDuel: () => void;
-
-  // Den tool cached generation
-  generateDenToolContent: (tool: string, title: string, text: string) => Promise<any>;
-  denToolCache: Record<string, any>;
+  // Den actions
+  openDenTool: (tool: DenToolKey) => void;
+  closeDenTool: () => void;
+  setActiveModule: (id: string | null) => void;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
 
-export function useDashboard(): DashboardContextValue {
-  const ctx = useContext(DashboardContext);
-  if (!ctx) throw new Error('useDashboard must be used within DashboardProvider');
-  return ctx;
+/* ===========================
+   Helpers
+   =========================== */
+function loadState(): AppState {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as AppState;
+      // Ensure duel is fresh on reload
+      parsed.duel = { ...INITIAL_DUEL, highScore: loadHighScore() };
+      return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return createInitialState();
 }
 
-// ── Helper: generate unique id ──
-const uid = () => crypto.randomUUID();
+function loadHighScore(): number {
+  try {
+    return Number(localStorage.getItem(HIGH_SCORE_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
 
-// ── Provider ──
+function createInitialState(): AppState {
+  const apiKey = localStorage.getItem(API_KEY_KEY) || '';
+  return {
+    hasEntered: !!apiKey,
+    apiKey,
+    activeModuleId: null,
+    modules: [],
+    activeTab: 'dashboard',
+    modal: 'none',
+    isLoading: false,
+    error: null,
+    notifications: [],
+    duel: { ...INITIAL_DUEL, highScore: loadHighScore() },
+    activeDenTool: null,
+    documentImages: [],
+  };
+}
 
-export function DashboardProvider({ children }: { children: React.ReactNode }) {
-  const [hasEntered, setHasEnteredState] = useState<boolean>(() => {
-    return localStorage.getItem(HAS_ENTERED_KEY) === 'true';
-  });
-  const [apiKey, setApiKeyState] = useState<string | null>(() => localStorage.getItem('learnarena_openrouter_key'));
+function persistState(state: AppState): void {
+  try {
+    // Don't persist duel (rehydrate fresh) or apiKey (stored separately)
+    const toStore = {
+      ...state,
+      apiKey: '', // don't store key in main state
+      duel: INITIAL_DUEL,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
+  } catch {
+    // localStorage might be full
+  }
+}
 
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(() => {
-    try {
-      const raw = localStorage.getItem(DASHBOARD_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [savedModules, setSavedModules] = useState<SavedModule[]>(() => {
-    try {
-      const raw = localStorage.getItem(SAVED_MODULES_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  });
-
-  const [totalXp, setTotalXp] = useState<number>(() => {
-    try { return Number(localStorage.getItem(XP_KEY)) || 0; } catch { return 0; }
-  });
-
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    try {
-      const raw = localStorage.getItem(NOTIFICATIONS_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  });
-
-  const [denToolCache, setDenToolCache] = useState<Record<string, any>>({});
-
-  // ── Duel state ──
-  const [duel, setDuel] = useState<DuelState>({
-    phase: 'idle',
-    playerScore: 0,
-    rivalScore: 0,
-    lives: 3,
-    combo: 0,
-    maxCombo: 0,
-    bestStreak: 0,
-    currentStreak: 0,
-    questionIndex: 0,
-    questions: [],
-    answerHistory: [],
-    result: null,
+/* ===========================
+   Provider
+   =========================== */
+export function DashboardProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<AppState>(() => {
+    const initial = loadState();
+    // Restore apiKey from separate storage
+    const key = localStorage.getItem(API_KEY_KEY) || '';
+    initial.apiKey = key;
+    initial.hasEntered = !!key;
+    return initial;
   });
 
-  const duelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const duelTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Persist helpers ──
-  const persistDashboard = useCallback((data: DashboardData | null) => {
-    setDashboardData(data);
-    if (data) {
-      localStorage.setItem(DASHBOARD_KEY, JSON.stringify(data));
-    } else {
-      localStorage.removeItem(DASHBOARD_KEY);
-    }
+  const saveState = useCallback((updater: (prev: AppState) => AppState) => {
+    setState((prev) => {
+      const next = updater(prev);
+      persistState(next);
+      return next;
+    });
   }, []);
 
-  const persistSavedModules = useCallback((modules: SavedModule[]) => {
-    setSavedModules(modules);
-    localStorage.setItem(SAVED_MODULES_KEY, JSON.stringify(modules));
-  }, []);
+  /* ===========================
+     Tab / Modal
+     =========================== */
+  const setActiveTab = useCallback((tab: TabKey) => {
+    saveState((s) => ({ ...s, activeTab: tab }));
+  }, [saveState]);
 
-  const persistXp = useCallback((xp: number) => {
-    setTotalXp(xp);
-    localStorage.setItem(XP_KEY, String(xp));
-  }, []);
-
-  const persistNotifications = useCallback((notes: AppNotification[]) => {
-    setNotifications(notes);
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notes));
-  }, []);
-
-  const setHasEntered = useCallback((v: boolean) => {
-    setHasEnteredState(v);
-    if (v) localStorage.setItem(HAS_ENTERED_KEY, 'true');
-    else localStorage.removeItem(HAS_ENTERED_KEY);
-  }, []);
+  const setModal = useCallback((modal: ModalType) => {
+    saveState((s) => ({ ...s, modal }));
+  }, [saveState]);
 
   const setApiKey = useCallback((key: string) => {
-    setApiKeyState(key);
-    localStorage.setItem('learnarena_openrouter_key', key);
-  }, []);
+    localStorage.setItem(API_KEY_KEY, key);
+    saveState((s) => ({
+      ...s,
+      apiKey: key,
+      hasEntered: true,
+      modal: key ? 'notesInput' : 'apiKey',
+    }));
+  }, [saveState]);
 
-  // ── Generate from pasted notes ──
-  const generateFromNotes = useCallback(async (notes: string) => {
-    if (!notes.trim()) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await generateDashboard(notes);
-      persistDashboard(data);
-      toast.success('Dashboard generated!');
-    } catch (err) {
-      const msg = err instanceof OpenRouterError ? err.message : 'Generation failed';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [persistDashboard]);
-
-  // ── Generate from uploaded files ──
-  const generateFromFiles = useCallback(async (files: File[]) => {
-    const validation = validateFiles(files);
-    if (!validation.valid) {
-      toast.error(validation.error ?? 'Invalid files');
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      let allText = '';
-      let allImages: string[] = [];
-      for (const file of files) {
-        const result = await parseFile(file);
-        allText += `\n\n--- ${file.name} ---\n\n${result.text}`;
-        allImages = [...allImages, ...result.images].slice(0, 10);
-      }
-
-      // Store images for context
-      const tempTitle = files.map(f => f.name).join(', ');
-      setDocumentImages(tempTitle, allImages);
-
-      const data = await generateDashboard(allText, allImages);
-      persistDashboard(data);
-      toast.success('Dashboard generated from files!');
-    } catch (err) {
-      const msg = err instanceof OpenRouterError ? err.message : 'File processing failed';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [persistDashboard]);
-
-  // ── Reset ──
-  const resetDashboard = useCallback(() => {
-    persistDashboard(null);
-    setError(null);
-    toast.success('Dashboard cleared');
-  }, [persistDashboard]);
-
-  // ── Export ──
-  const exportDashboard = useCallback(() => {
-    try {
-      const data = localStorage.getItem(DASHBOARD_KEY);
-      if (!data) { toast.error('No dashboard to export'); return; }
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `learnarena-export-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Dashboard exported');
-    } catch {
-      toast.error('Export failed');
-    }
-  }, []);
-
-  // ── Save / Load / Delete modules ──
-  const saveModule = useCallback((title: string) => {
-    if (!dashboardData) { toast.error('No dashboard to save'); return; }
-    const mod: SavedModule = {
-      id: uid(),
-      title,
-      timestamp: Date.now(),
-      dashboardData,
-    };
-    persistSavedModules([...savedModules, mod]);
-    toast.success(`Saved "${title}"`);
-  }, [dashboardData, savedModules, persistSavedModules]);
-
-  const loadModule = useCallback((id: string) => {
-    const mod = savedModules.find(m => m.id === id);
-    if (!mod) { toast.error('Module not found'); return; }
-    persistDashboard(mod.dashboardData);
-    toast.success(`Loaded "${mod.title}"`);
-  }, [savedModules, persistDashboard]);
-
-  const deleteModule = useCallback((id: string) => {
-    persistSavedModules(savedModules.filter(m => m.id !== id));
-    toast.success('Module deleted');
-  }, [savedModules, persistSavedModules]);
-
-  // ── XP ──
-  const addXp = useCallback((amount: number) => {
-    persistXp(totalXp + amount);
-  }, [totalXp, persistXp]);
-
-  // ── Notifications ──
-  const addNotification = useCallback((type: AppNotification['type'], title: string, body: string) => {
-    const notif: AppNotification = {
-      id: uid(),
-      type,
-      title,
-      body,
-      timestamp: Date.now(),
-      read: false,
-    };
-    persistNotifications([notif, ...notifications]);
-  }, [notifications, persistNotifications]);
-
-  const markNotificationRead = useCallback((id: string) => {
-    persistNotifications(
-      notifications.map(n => n.id === id ? { ...n, read: true } : n),
-    );
-  }, [notifications, persistNotifications]);
+  /* ===========================
+     Notifications
+     =========================== */
+  const addNotification = useCallback(
+    (n: Omit<Notification, 'id' | 'timestamp'>) => {
+      const notification: Notification = {
+        ...n,
+        id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: Date.now(),
+      };
+      saveState((s) => ({
+        ...s,
+        notifications: [notification, ...s.notifications].slice(0, 50),
+      }));
+    },
+    [saveState],
+  );
 
   const clearNotifications = useCallback(() => {
-    persistNotifications([]);
-  }, [persistNotifications]);
+    saveState((s) => ({ ...s, notifications: [] }));
+  }, [saveState]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const markNotificationRead = useCallback(
+    (id: string) => {
+      saveState((s) => ({
+        ...s,
+        notifications: s.notifications.map((n) =>
+          n.id === id ? { ...n, read: true } : n,
+        ),
+      }));
+    },
+    [saveState],
+  );
 
-  // ── Duel ──
+  /* ===========================
+     Dashboard Generation
+     =========================== */
+  const generateFromNotes = useCallback(
+    async (notes: string, files?: File[]) => {
+      saveState((s) => ({ ...s, isLoading: true, error: null }));
+
+      try {
+        let finalNotes = notes;
+        let images: DocumentImage[] = [];
+
+        if (files && files.length > 0) {
+          const result = await parseMultipleFiles(files);
+          finalNotes = result.text || notes;
+          images = result.images;
+          if (result.errors.length > 0) {
+            addNotification({
+              type: 'error',
+              message: result.errors.join('\n'),
+              read: false,
+            });
+          }
+        }
+
+        const apiKey = localStorage.getItem(API_KEY_KEY);
+        if (!apiKey) {
+          throw new Error('API key not found');
+        }
+
+        const imageDataUrls = images.map((img) => img.dataUrl);
+        const dashboard = await generateDashboard(
+          apiKey,
+          finalNotes,
+          imageDataUrls.length > 0 ? imageDataUrls : undefined,
+        );
+
+        // Create module
+        const moduleId = `mod-${Date.now()}`;
+        const moduleData: ModuleData = {
+          id: moduleId,
+          title: dashboard.moduleTitle || 'Untitled Module',
+          notes: finalNotes,
+          images,
+          dashboard,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          xp: dashboard.masteryProgress.totalXp || 0,
+        };
+
+        saveState((s) => ({
+          ...s,
+          isLoading: false,
+          activeModuleId: moduleId,
+          modules: [...s.modules, moduleData],
+          activeTab: 'dashboard',
+          modal: 'none',
+          documentImages: images,
+          error: null,
+        }));
+
+        addNotification({
+          type: 'xp',
+          message: `Module created! +${dashboard.masteryProgress.totalXp || 0} XP`,
+          read: false,
+        });
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Failed to generate dashboard';
+        saveState((s) => ({
+          ...s,
+          isLoading: false,
+          error: message,
+        }));
+        addNotification({ type: 'error', message, read: false });
+      }
+    },
+    [saveState, addNotification],
+  );
+
+  const resetDashboard = useCallback(() => {
+    saveState((s) => ({
+      ...s,
+      activeModuleId: null,
+      error: null,
+      documentImages: [],
+    }));
+    clearDocumentImages();
+  }, [saveState]);
+
+  /* ===========================
+     Module Management
+     =========================== */
+  const saveCurrentModule = useCallback(() => {
+    saveState((s) => {
+      if (!s.activeModuleId) return s;
+      return {
+        ...s,
+        modules: s.modules.map((m) =>
+          m.id === s.activeModuleId ? { ...m, updatedAt: Date.now() } : m,
+        ),
+      };
+    });
+  }, [saveState]);
+
+  const loadModule = useCallback(
+    (moduleId: string) => {
+      saveState((s) => {
+        const mod = s.modules.find((m) => m.id === moduleId);
+        if (!mod) return s;
+        return {
+          ...s,
+          activeModuleId: moduleId,
+          activeTab: 'dashboard',
+          documentImages: mod.images || [],
+        };
+      });
+    },
+    [saveState],
+  );
+
+  const deleteModule = useCallback(
+    (moduleId: string) => {
+      saveState((s) => {
+        const modules = s.modules.filter((m) => m.id !== moduleId);
+        const newActiveId =
+          s.activeModuleId === moduleId
+            ? modules.length > 0
+              ? modules[modules.length - 1].id
+              : null
+            : s.activeModuleId;
+        clearSeenForModule(moduleId);
+        return {
+          ...s,
+          modules,
+          activeModuleId: newActiveId,
+        };
+      });
+    },
+    [saveState],
+  );
+
+  const setActiveModule = useCallback(
+    (id: string | null) => {
+      saveState((s) => ({ ...s, activeModuleId: id }));
+    },
+    [saveState],
+  );
+
+  /* ===========================
+     XP
+     =========================== */
+  const addXp = useCallback(
+    (amount: number) => {
+      saveState((s) => ({
+        ...s,
+        modules: s.modules.map((m) =>
+          m.id === s.activeModuleId ? { ...m, xp: m.xp + amount } : m,
+        ),
+      }));
+    },
+    [saveState],
+  );
+
+  /* ===========================
+     Duel
+     =========================== */
   const startDuel = useCallback(async () => {
-    if (!dashboardData) { toast.error('No study material loaded'); return; }
-    setDuel(prev => ({ ...prev, phase: 'preparing', questions: [], questionIndex: 0, playerScore: 0, rivalScore: 0, lives: 3, combo: 0, maxCombo: 0, currentStreak: 0, bestStreak: 0, answerHistory: [], result: null }));
+    saveState((s) => ({
+      ...s,
+      duel: { ...s.duel, phase: 'preparing', highScore: loadHighScore() },
+    }));
 
     try {
-      const excluded = getSeenQuestions();
-      const sourceText = [
-        dashboardData.synthesis.keyTakeaways.join('\n'),
-        ...dashboardData.concepts.map(c => `${c.term}: ${c.definition}`),
-        dashboardData.scenario.scenario,
-      ].join('\n\n');
-
-      const questions = await generateFreshQuestions(
-        dashboardData.moduleTitle,
-        sourceText,
-        getDocumentImages(dashboardData.moduleTitle),
-        excluded,
-        12,
+      const apiKey = localStorage.getItem(API_KEY_KEY);
+      const activeModule = state.modules.find(
+        (m) => m.id === state.activeModuleId,
       );
+      if (!apiKey || !activeModule) throw new Error('No module or API key');
 
-      setDuel(prev => ({
-        ...prev,
-        phase: 'playing',
-        questions,
-        questionIndex: 0,
-        combo: 0,
-        currentStreak: 0,
+      const questions = await generateFreshQuestions(apiKey, activeModule.notes);
+
+      saveState((s) => ({
+        ...s,
+        duel: {
+          ...s.duel,
+          phase: 'playing',
+          questions,
+          currentIndex: 0,
+          playerScore: 0,
+          rivalScore: 0,
+          playerLives: 3,
+          combo: 0,
+          comboLevel: 0,
+          timeLeft: DUEL_TIME_LIMIT,
+          hasShield: false,
+          isAnswered: false,
+          selectedAnswer: null,
+          hintOpen: false,
+        },
       }));
 
-      // Mark these questions as seen
-      markManySeen(questions.map(q => q.question));
+      // Start timer
+      if (duelTimerRef.current) clearInterval(duelTimerRef.current);
+      duelTimerRef.current = setInterval(() => {
+        setState((prev) => {
+          if (prev.duel.phase !== 'playing' || prev.duel.isAnswered) {
+            return prev;
+          }
+          const newTime = prev.duel.timeLeft - 1;
+          if (newTime <= 0) {
+            // Time's up — lose a life
+            const lives = prev.duel.playerLives - 1;
+            const isOver = lives <= 0;
+            return {
+              ...prev,
+              duel: {
+                ...prev.duel,
+                timeLeft: 0,
+                isAnswered: true,
+                playerLives: lives,
+                phase: isOver ? 'done' : 'playing',
+                combo: 0,
+                comboLevel: 0,
+                hasShield: false,
+              },
+            };
+          }
+          return { ...prev, duel: { ...prev.duel, timeLeft: newTime } };
+        });
+      }, 1000);
     } catch (err) {
-      const msg = err instanceof OpenRouterError ? err.message : 'Failed to prepare duel';
-      toast.error(msg);
-      setDuel(prev => ({ ...prev, phase: 'idle' }));
+      const message =
+        err instanceof Error ? err.message : 'Failed to start duel';
+      saveState((s) => ({
+        ...s,
+        duel: { ...s.duel, phase: 'idle' },
+        error: message,
+      }));
     }
-  }, [dashboardData]);
+  }, [saveState, state.modules, state.activeModuleId]);
 
-  const answerDuelQuestion = useCallback((selectedIndex: number) => {
-    setDuel(prev => {
-      if (prev.phase !== 'playing') return prev;
-      const q = prev.questions[prev.questionIndex];
-      if (!q) return prev;
+  const answerDuelQuestion = useCallback(
+    (index: number) => {
+      setState((prev) => {
+        if (prev.duel.isAnswered || prev.duel.phase !== 'playing') return prev;
 
-      const correct = selectedIndex === q.correctIndex;
-      const newCombo = correct ? prev.combo + 1 : 0;
-      const newStreak = correct ? prev.currentStreak + 1 : 0;
+        const current = prev.duel.questions[prev.duel.currentIndex];
+        if (!current) return prev;
 
-      // Score multiplier from combo
-      let multiplier = 1;
-      if (newCombo >= 10) multiplier = 20;
-      else if (newCombo >= 5) multiplier = 5;
-      else if (newCombo >= 3) multiplier = 3;
+        const isCorrect = index === current.correctIndex;
+        const newCombo = isCorrect ? prev.duel.combo + 1 : 0;
+        const multiplier = getComboMultiplier(newCombo);
+        const basePoints = isCorrect ? 100 : 0;
+        const points = basePoints * multiplier;
+        const comboLevelIdx = isCorrect
+          ? ['none', 'bronze', 'silver', 'gold', 'platinum'].indexOf(
+              getComboLevel(newCombo),
+            )
+          : 0;
+        const hasShield = getComboLevel(newCombo) === 'platinum';
 
-      // RIVAL-9: 65% accuracy, 1.8-4.2s simulated response
-      const rivalCorrect = Math.random() < 0.65;
-      const rivalPoints = rivalCorrect ? 100 : 0;
+        // RIVAL-9 answers
+        const rivalCorrect = Math.random() < DUEL_RIVAL_ACCURACY;
+        const rivalPoints = rivalCorrect
+          ? 80 + Math.floor(Math.random() * 40)
+          : 0;
 
-      const newPlayerScore = prev.playerScore + (correct ? 100 * multiplier : 0);
-      const newRivalScore = prev.rivalScore + rivalPoints;
-      const newLives = correct ? prev.lives : prev.lives - 1;
-      const newQuestionIndex = prev.questionIndex + 1;
-
-      const answerHistory = [...prev.answerHistory, { questionId: q.id, correct }];
-
-      // Check game over
-      const isGameOver = newLives <= 0 || newQuestionIndex >= prev.questions.length;
-
-      if (isGameOver) {
-        let result: DuelResult;
-        if (newPlayerScore > newRivalScore) result = 'victory';
-        else if (newPlayerScore < newRivalScore) result = 'defeat';
-        else result = 'draw';
-
-        // Award XP for duel
-        if (result === 'victory') {
-          toast.success(`Victory! +${XP_FOR_DUEL} XP`);
-          // XP added via the summary screen
-        }
+        const newLives = !isCorrect ? prev.duel.playerLives - 1 : prev.duel.playerLives;
+        const isOver = newLives <= 0;
+        const newPlayerScore = prev.duel.playerScore + points;
+        const newRivalScore = prev.duel.rivalScore + rivalPoints;
 
         return {
           ...prev,
-          playerScore: newPlayerScore,
-          rivalScore: newRivalScore,
-          lives: newLives,
-          combo: newCombo,
-          maxCombo: Math.max(prev.maxCombo, newCombo),
-          bestStreak: Math.max(prev.bestStreak, newStreak),
-          currentStreak: newStreak,
-          questionIndex: newQuestionIndex,
-          answerHistory,
-          phase: 'done',
-          result,
+          duel: {
+            ...prev.duel,
+            isAnswered: true,
+            selectedAnswer: index,
+            playerScore: newPlayerScore,
+            rivalScore: newRivalScore,
+            playerLives: newLives,
+            combo: newCombo,
+            comboLevel: comboLevelIdx,
+            hasShield,
+            timeLeft: isCorrect ? prev.duel.timeLeft : 0,
+            phase: isOver
+              ? 'done'
+              : prev.duel.currentIndex >= prev.duel.questions.length - 1
+                ? 'done'
+                : 'playing',
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const nextDuelQuestion = useCallback(() => {
+    setState((prev) => {
+      const nextIdx = prev.duel.currentIndex + 1;
+      if (nextIdx >= prev.duel.questions.length) {
+        // Determine winner
+        const playerWon = prev.duel.playerScore > prev.duel.rivalScore;
+        const isDraw = prev.duel.playerScore === prev.duel.rivalScore;
+        const newHighScore = Math.max(
+          prev.duel.highScore,
+          prev.duel.playerScore,
+        );
+        localStorage.setItem(HIGH_SCORE_KEY, String(newHighScore));
+
+        return {
+          ...prev,
+          duel: {
+            ...prev.duel,
+            phase: 'done',
+            highScore: newHighScore,
+          },
         };
       }
 
       return {
         ...prev,
-        playerScore: newPlayerScore,
-        rivalScore: newRivalScore,
-        lives: newLives,
-        combo: newCombo,
-        maxCombo: Math.max(prev.maxCombo, newCombo),
-        bestStreak: Math.max(prev.bestStreak, newStreak),
-        currentStreak: newStreak,
-        questionIndex: newQuestionIndex,
-        answerHistory,
+        duel: {
+          ...prev.duel,
+          currentIndex: nextIdx,
+          timeLeft: DUEL_TIME_LIMIT,
+          isAnswered: false,
+          selectedAnswer: null,
+          hintOpen: false,
+        },
       };
     });
   }, []);
 
+  const tickDuelTimer = useCallback(() => {
+    // handled in interval
+  }, []);
+
+  const closeDuelHint = useCallback(() => {
+    saveState((s) => ({ ...s, duel: { ...s.duel, hintOpen: false } }));
+  }, [saveState]);
+
   const resetDuel = useCallback(() => {
-    setDuel({
-      phase: 'idle',
-      playerScore: 0,
-      rivalScore: 0,
-      lives: 3,
-      combo: 0,
-      maxCombo: 0,
-      bestStreak: 0,
-      currentStreak: 0,
-      questionIndex: 0,
-      questions: [],
-      answerHistory: [],
-      result: null,
-    });
-  }, []);
+    if (duelTimerRef.current) clearInterval(duelTimerRef.current);
+    saveState((s) => ({
+      ...s,
+      duel: { ...INITIAL_DUEL, highScore: loadHighScore() },
+    }));
+  }, [saveState]);
 
-  // ── Den tool cache ──
-  const generateDenToolContent = useCallback(async (tool: string, title: string, text: string) => {
-    const cacheKey = `${tool}::${title}`;
-    if (denToolCache[cacheKey]) return denToolCache[cacheKey];
+  /* ===========================
+     Learner's Den
+     =========================== */
+  const openDenTool = useCallback(
+    (tool: DenToolKey) => {
+      saveState((s) => ({ ...s, activeDenTool: tool, activeTab: 'den' }));
+    },
+    [saveState],
+  );
 
-    try {
-      const images = getDocumentImages(title);
-      const data = await generateDenContent(tool as any, title, text, images);
-      setDenToolCache(prev => ({ ...prev, [cacheKey]: data }));
-      return data;
-    } catch (err) {
-      throw err;
-    }
-  }, [denToolCache]);
+  const closeDenTool = useCallback(() => {
+    saveState((s) => ({ ...s, activeDenTool: null }));
+  }, [saveState]);
 
-  // ── Clean up timer on unmount ──
-  useEffect(() => {
-    return () => {
-      if (duelTimerRef.current) clearTimeout(duelTimerRef.current);
-    };
-  }, []);
-
+  /* ===========================
+     Value
+     =========================== */
   const value: DashboardContextValue = {
-    hasEntered,
-    setHasEntered,
-    apiKey,
+    state,
+    setActiveTab,
+    setModal,
     setApiKey,
-    dashboardData,
-    isLoading,
-    error,
     generateFromNotes,
-    generateFromFiles,
     resetDashboard,
-    exportDashboard,
-    savedModules,
-    saveModule,
+    saveCurrentModule,
     loadModule,
     deleteModule,
-    totalXp,
     addXp,
-    notifications,
     addNotification,
-    markNotificationRead,
     clearNotifications,
-    unreadCount,
-    duel,
+    markNotificationRead,
     startDuel,
     answerDuelQuestion,
+    nextDuelQuestion,
+    tickDuelTimer,
+    closeDuelHint,
     resetDuel,
-    generateDenToolContent,
-    denToolCache,
+    openDenTool,
+    closeDenTool,
+    setActiveModule,
   };
 
   return (
@@ -489,4 +621,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       {children}
     </DashboardContext.Provider>
   );
+}
+
+export function useDashboard(): DashboardContextValue {
+  const ctx = useContext(DashboardContext);
+  if (!ctx) throw new Error('useDashboard must be used within DashboardProvider');
+  return ctx;
 }

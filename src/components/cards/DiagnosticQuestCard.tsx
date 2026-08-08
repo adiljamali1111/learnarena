@@ -1,167 +1,176 @@
-import { useState, useMemo } from 'react';
-import { BrainCircuit, HelpCircle, ChevronRight } from 'lucide-react';
-import type { DiagnosticQuestion, DiagnosticCard } from '../../types/dashboard';
+import { useState, useCallback } from 'react';
+import { ClipboardCheck, ChevronRight, HelpCircle, Zap } from 'lucide-react';
+import type { DiagnosticQuestion } from '../../types/dashboard';
+import { markQuestionSeen } from '../../services/questionBank';
 
 interface Props {
-  data: DiagnosticCard;
-  onRefresh?: () => void;
-  onXpEarned?: (xp: number) => void;
+  data: DiagnosticQuestion[];
+  moduleId: string;
+  onXpGained?: (amount: number) => void;
 }
 
-function shuffleArray<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-export default function DiagnosticQuestCard({ data, onRefresh, onXpEarned }: Props) {
-  const [shuffledQuestions] = useState(() => shuffleArray(data.questions));
-  const [currentQ, setCurrentQ] = useState(0);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+export default function DiagnosticQuestCard({ data, moduleId, onXpGained }: Props) {
+  const [index, setIndex] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [isRevealed, setIsRevealed] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [answers, setAnswers] = useState<{ correct: boolean }[]>([]);
-  const [finished, setFinished] = useState(false);
+  const [results, setResults] = useState<Record<string, boolean>>({});
 
-  const question = shuffledQuestions[currentQ];
-  const shuffledOptions = useMemo(
-    () => (question ? shuffleArray(question.options.map((opt, i) => ({ text: opt, origIndex: i }))) : []),
-    [question],
+  const current = data[index];
+  if (!current) return null;
+
+  const handleSelect = useCallback(
+    (optionIndex: number) => {
+      if (isRevealed) return;
+      setSelected(optionIndex);
+      setIsRevealed(true);
+
+      const isCorrect = optionIndex === current.correctIndex;
+      setResults((prev) => ({ ...prev, [current.id]: isCorrect }));
+      markQuestionSeen(current.id, moduleId);
+
+      if (isCorrect && onXpGained) {
+        const xp = current.difficulty === 'hard' ? 30 : current.difficulty === 'medium' ? 20 : 10;
+        onXpGained(xp);
+      }
+    },
+    [isRevealed, current, moduleId, onXpGained],
   );
 
-  const handleSelect = (idx: number) => {
-    if (selectedIndex !== null) return;
-    setSelectedIndex(idx);
-
-    const correct = shuffledOptions[idx].origIndex === question.correctIndex;
-    const newAnswers = [...answers, { correct }];
-    setAnswers(newAnswers);
-
-    if (correct) {
-      onXpEarned?.(25);
-      setTimeout(() => {
-        if (currentQ < shuffledQuestions.length - 1) {
-          setCurrentQ((q) => q + 1);
-          setSelectedIndex(null);
-          setShowHint(false);
-        } else {
-          setFinished(true);
-        }
-      }, 800);
-    } else {
-      setShowHint(true);
+  const handleNext = () => {
+    if (index < data.length - 1) {
+      setIndex((i) => i + 1);
+      setSelected(null);
+      setIsRevealed(false);
+      setShowHint(false);
     }
   };
 
-  const correctCount = answers.filter((a) => a.correct).length;
-  const totalCorrect = answers.length > 0 ? correctCount : 0;
-  const totalAnswered = answers.length;
-
-  if (finished) {
-    return (
-      <div className="glass-card p-5 animate-fade-in-up">
-        <div className="flex items-center gap-2 mb-3">
-          <BrainCircuit className="w-5 h-5 text-primary" />
-          <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Diagnostic Quest — Complete</h3>
-        </div>
-        <div className="text-center py-6">
-          <p className="text-3xl font-heading font-bold text-primary mb-2">{totalCorrect}/{shuffledQuestions.length}</p>
-          <p className="text-sm text-muted mb-4">Questions answered correctly</p>
-          <p className="text-xs text-gold">+{totalCorrect * 25} XP earned</p>
-          {onRefresh && (
-            <button
-              onClick={onRefresh}
-              className="mt-4 px-4 py-2 rounded-xl bg-primary text-dark-base text-xs font-heading font-bold hover:bg-primary-light transition-colors cursor-pointer"
-            >
-              GENERATE FRESH QUESTIONS
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (!question) return null;
+  const correctCount = Object.values(results).filter(Boolean).length;
+  const isLast = index === data.length - 1;
 
   return (
-    <div className="glass-card p-5 animate-fade-in-up">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <BrainCircuit className="w-5 h-5 text-primary" />
-          <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Diagnostic Quest</h3>
+    <div className="glass-card p-6 flex flex-col">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-success/20 flex items-center justify-center">
+          <ClipboardCheck size={18} className="text-success" />
         </div>
-        <span className="text-2xs text-muted-lighter">{currentQ + 1} / {shuffledQuestions.length}</span>
+        <div className="flex-1">
+          <h3 className="font-heading font-semibold text-lg">Diagnostic Quest</h3>
+          <p className="text-xs text-muted-lighter">
+            {index + 1} of {data.length}
+            {Object.keys(results).length > 0 && (
+              <span className="ml-2">
+                • {correctCount}/{Object.keys(results).length} correct
+              </span>
+            )}
+          </p>
+        </div>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted capitalize">
+          {current.difficulty || 'medium'}
+        </span>
       </div>
 
-      {/* Progress dots */}
-      <div className="flex gap-1 mb-4">
-        {shuffledQuestions.map((_, i) => (
-          <div
-            key={i}
-            className={`flex-1 h-1 rounded-full transition-colors ${
-              i < currentQ ? 'bg-success' : i === currentQ ? 'bg-primary' : 'bg-dark-hover'
-            }`}
-          />
-        ))}
-      </div>
+      <p className="text-sm font-medium text-foreground mb-4">{current.question}</p>
 
-      <p className="text-sm text-foreground font-medium mb-4 leading-relaxed">{question.question}</p>
+      {/* Options */}
+      <div className="flex-1 space-y-2">
+        {current.options.map((option, i) => {
+          let borderClass = 'border-glass-border hover:border-accent/40';
+          let bgClass = '';
 
-      <div className="space-y-2">
-        {shuffledOptions.map((opt, idx) => {
-          const isSelected = selectedIndex === idx;
-          const isCorrect = opt.origIndex === question.correctIndex;
-          let btnClass = 'bg-dark-elevated/60 border-border hover:border-primary/40';
-
-          if (selectedIndex !== null) {
-            if (isCorrect) btnClass = 'border-success bg-success/10';
-            else if (isSelected) btnClass = 'border-destructive bg-destructive/10';
+          if (isRevealed) {
+            if (i === current.correctIndex) {
+              borderClass = 'border-success bg-success/10';
+            } else if (i === selected) {
+              borderClass = 'border-destructive bg-destructive/10';
+            }
+          } else if (i === selected) {
+            borderClass = 'border-accent bg-accent/10';
           }
 
           return (
             <button
-              key={idx}
-              onClick={() => handleSelect(idx)}
-              disabled={selectedIndex !== null}
-              className={`w-full text-left px-4 py-3 rounded-xl border text-sm text-foreground transition-all duration-200 cursor-pointer disabled:cursor-default ${btnClass}`}
+              key={i}
+              onClick={() => handleSelect(i)}
+              disabled={isRevealed}
+              className={`w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer disabled:cursor-default ${borderClass} ${bgClass}`}
             >
-              {opt.text}
+              <div className="flex items-start gap-3">
+                <span className="text-xs text-muted-lighter w-5 shrink-0 mt-0.5 font-mono">
+                  {String.fromCharCode(65 + i)}.
+                </span>
+                <span className="text-sm text-foreground/80">{option}</span>
+              </div>
             </button>
           );
         })}
       </div>
 
-      {/* Hint */}
+      {/* Hint button */}
+      {isRevealed && selected !== current.correctIndex && !showHint && (
+        <button
+          onClick={() => setShowHint(true)}
+          className="mt-3 flex items-center gap-2 text-xs text-warning hover:text-warning/80 transition-colors cursor-pointer"
+        >
+          <HelpCircle size={14} />
+          Show explanation
+        </button>
+      )}
+
+      {/* Explanation */}
       {showHint && (
-        <div className="mt-4 p-3 rounded-xl bg-accent/10 border border-accent/30">
-          <div className="flex items-center gap-1.5 mb-1">
-            <HelpCircle className="w-4 h-4 text-accent" />
-            <span className="text-xs font-bold text-accent">Hint</span>
-          </div>
-          <p className="text-xs text-muted leading-relaxed">{question.hint}</p>
-          <button
-            onClick={() => {
-              setShowHint(false);
-              if (currentQ < shuffledQuestions.length - 1) {
-                setCurrentQ((q) => q + 1);
-                setSelectedIndex(null);
-              } else {
-                setFinished(true);
-              }
-            }}
-            className="mt-2 flex items-center gap-1 text-xs text-primary hover:text-primary-light transition-colors cursor-pointer"
-          >
-            Continue <ChevronRight className="w-3 h-3" />
-          </button>
+        <div className="mt-3 glass-card p-3 bg-accent/5 border-accent/20 animate-fade-in-up">
+          <p className="text-xs text-muted-lighter mb-1">Explanation</p>
+          <p className="text-sm text-foreground/80">{current.explanation}</p>
+          {current.distractorsExplanation && (
+            <>
+              <p className="text-xs text-muted-lighter mt-2 mb-1">Distractors</p>
+              <p className="text-sm text-muted">{current.distractorsExplanation}</p>
+            </>
+          )}
         </div>
       )}
 
-      {/* Explanation on answered */}
-      {selectedIndex !== null && (
-        <div className="mt-4 p-3 rounded-xl bg-dark-elevated/60 border border-border">
-          <p className="text-xs text-muted leading-relaxed">{question.explanation}</p>
+      {/* Progress dots + Next */}
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-glass-border">
+        <div className="flex gap-1">
+          {data.map((q, i) => (
+            <div
+              key={q.id}
+              className={`w-2 h-2 rounded-full transition-colors ${
+                results[q.id] === undefined
+                  ? 'bg-white/20'
+                  : results[q.id]
+                    ? 'bg-success'
+                    : 'bg-destructive'
+              }`}
+            />
+          ))}
+        </div>
+
+        {isRevealed && !isLast && (
+          <button
+            onClick={handleNext}
+            className="flex items-center gap-1 text-xs text-accent hover:text-accent/80 transition-colors cursor-pointer"
+          >
+            Next <ChevronRight size={14} />
+          </button>
+        )}
+      </div>
+
+      {/* Score summary */}
+      {isRevealed && isLast && (
+        <div className="mt-3 flex items-center gap-2 text-xs text-gold">
+          <Zap size={14} />
+          <span>
+            {correctCount}/{data.length} correct —{' '}
+            {correctCount === data.length
+              ? 'Perfect score! 🎉'
+              : correctCount >= data.length * 0.7
+                ? 'Great job!'
+                : 'Keep practicing!'}
+          </span>
         </div>
       )}
     </div>

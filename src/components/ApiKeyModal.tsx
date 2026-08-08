@@ -1,168 +1,94 @@
-import { useState, useEffect } from 'react';
-import { Key, Eye, EyeOff, ExternalLink, ChevronDown, Check } from 'lucide-react';
-import { APIProvider } from '../types';
+import { useState } from 'react';
+import { Key, X } from 'lucide-react';
+import { useDashboard } from '../context/DashboardContext';
 
-interface ApiKeyModalProps {
-  isOpen: boolean;
-  onSubmit: (key: string, provider: APIProvider) => void;
-  error?: string;
-  currentProvider?: APIProvider;
-}
-
-const PROVIDERS: Array<{
-  id: APIProvider;
-  label: string;
-  description: string;
-  keyPrefix: string;
-  linkUrl: string;
-  linkLabel: string;
-}> = [
-  {
-    id: 'openrouter',
-    label: 'OpenRouter',
-    description: 'Multi-model API gateway with GPT-4o-mini and more',
-    keyPrefix: 'sk-or-v1-...',
-    linkUrl: 'https://openrouter.ai/keys',
-    linkLabel: 'Get an OpenRouter key',
-  },
-  {
-    id: 'google',
-    label: 'Google AI Studio',
-    description: 'Google Gemini 2.0 Flash — fast and free tier available',
-    keyPrefix: 'AIza...',
-    linkUrl: 'https://aistudio.google.com/apikey',
-    linkLabel: 'Get a Google AI Studio key',
-  },
-];
-
-export default function ApiKeyModal({ isOpen, onSubmit, error, currentProvider }: ApiKeyModalProps) {
+export default function ApiKeyModal() {
+  const { setApiKey, setModal } = useDashboard();
   const [key, setKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const [provider, setProvider] = useState<APIProvider>(currentProvider || 'openrouter');
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    setKey('');
-    setShowKey(false);
-  }, [provider]);
-
-  useEffect(() => {
-    if (isOpen && currentProvider) {
-      setProvider(currentProvider);
+  const handleSubmit = () => {
+    const trimmed = key.trim();
+    if (!trimmed) {
+      setError('Please enter an API key');
+      return;
     }
-  }, [isOpen, currentProvider]);
-
-  const selectedProvider = PROVIDERS.find((p) => p.id === provider)!;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (key.trim()) {
-      onSubmit(key.trim(), provider);
+    if (!trimmed.startsWith('sk-or-') && !trimmed.startsWith('sk-')) {
+      setError('Invalid key format. Should start with sk-or- or sk-');
+      return;
     }
+    setApiKey(trimmed);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-overlay animate-fade-in">
-      <div className="dark-glass rounded-xl p-8 w-full max-w-md animate-scale-in">
-        <div className="text-center mb-6">
-          <Key size={40} className="mx-auto text-primary mb-3" />
-          <h2 className="font-heading text-xl text-text-primary mb-2">API Key Setup</h2>
-          <p className="text-text-secondary text-sm">
-            LearnArena uses your own API key to generate study content.
-            Your key stays in your browser — it's never sent to our servers.
-          </p>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-md p-6 relative animate-fade-in-up">
+        {/* Close */}
+        <button
+          onClick={() => setModal('none')}
+          className="absolute top-4 right-4 text-muted hover:text-foreground transition-colors cursor-pointer"
+          aria-label="Close"
+        >
+          <X size={20} />
+        </button>
 
-        {error && (
-          <div className="mb-4 p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm">
-            {error}
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+            <Key className="text-primary" size={20} />
           </div>
-        )}
-
-        <div className="mb-4">
-          <label className="block text-text-muted text-xs mb-2 font-heading tracking-wider">API PROVIDER</label>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="glass-input w-full p-3 pr-10 text-sm flex items-center justify-between text-left"
-            >
-              <span className="text-text-primary">{selectedProvider.label}</span>
-              <ChevronDown
-                size={16}
-                className={`text-text-muted transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-
-            {dropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1 dark-glass rounded-xl p-1.5 z-10 shadow-2xl animate-slide-up">
-                {PROVIDERS.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      setProvider(p.id);
-                      setDropdownOpen(false);
-                    }}
-                    className={`w-full text-left p-3 rounded-lg text-sm transition-all flex items-center justify-between gap-3 ${
-                      provider === p.id
-                        ? 'bg-primary/10 text-text-primary'
-                        : 'text-text-secondary hover:bg-bg-card-hover hover:text-text-primary'
-                    }`}
-                  >
-                    <div>
-                      <p className="font-medium text-sm">{p.label}</p>
-                      <p className="text-text-muted text-xs mt-0.5">{p.description}</p>
-                    </div>
-                    {provider === p.id && <Check size={16} className="text-primary shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div>
+            <h2 className="font-heading font-bold text-lg">API Key</h2>
+            <p className="text-xs text-muted">Enter your OpenRouter API key</p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="relative mb-6">
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder={selectedProvider.keyPrefix}
-              className="glass-input w-full pr-10 p-3 text-sm font-mono"
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={() => setShowKey(!showKey)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary"
-              aria-label={showKey ? 'Hide key' : 'Show key'}
-            >
-              {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
+        <p className="text-sm text-muted mb-4 leading-relaxed">
+          You'll need an OpenRouter API key to power LearnArena. Your key is
+          stored only in your browser's localStorage and sent directly to
+          OpenRouter.
+        </p>
 
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => {
+            setKey(e.target.value);
+            setError('');
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          placeholder="sk-or-..."
+          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-glass-border text-foreground placeholder-muted-lighter font-mono text-sm focus:outline-none focus:border-accent transition-colors"
+          autoFocus
+        />
+
+        {error && <p className="text-destructive text-xs mt-2">{error}</p>}
+
+        <div className="flex gap-3 mt-6">
           <button
-            type="submit"
-            disabled={!key.trim()}
-            className="glass-button w-full py-3 font-heading tracking-wider"
+            onClick={() => setModal('none')}
+            className="btn-base flex-1 py-3 rounded-xl bg-white/5 text-muted hover:text-foreground hover:bg-white/10 transition-colors"
           >
-            CONNECT
+            Cancel
           </button>
-        </form>
+          <button
+            onClick={handleSubmit}
+            className="btn-base flex-1 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold hover:shadow-glow-purple transition-all"
+          >
+            Save Key
+          </button>
+        </div>
 
-        <div className="mt-4 text-center">
+        <p className="text-xs text-muted-lighter mt-4 text-center">
           <a
-            href={selectedProvider.linkUrl}
+            href="https://openrouter.ai/keys"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-text-muted text-xs hover:text-accent inline-flex items-center gap-1 transition-colors"
+            className="text-accent hover:underline"
           >
-            {selectedProvider.linkLabel} <ExternalLink size={12} />
+            Get a key at openrouter.ai/keys
           </a>
-        </div>
+        </p>
       </div>
     </div>
   );

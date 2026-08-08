@@ -1,18 +1,19 @@
-// In-memory cache of uploaded document images (data-URLs) for vision AI
-const imageCache = new Map<string, string[]>();
+import type { DocumentImage } from '../types/dashboard';
 
-export function setDocumentImages(moduleTitle: string, images: string[]): void {
-  imageCache.set(moduleTitle, images);
+let imageCache: DocumentImage[] = [];
+
+export function getDocumentImages(): DocumentImage[] {
+  return imageCache;
 }
 
-export function getDocumentImages(moduleTitle: string): string[] {
-  return imageCache.get(moduleTitle) ?? [];
+export function addDocumentImage(img: DocumentImage): void {
+  imageCache.push(img);
 }
 
-export function clearDocumentImages(moduleTitle: string): void {
-  imageCache.delete(moduleTitle);
+export function clearDocumentImages(): void {
+  imageCache = [];
 }
 
-export function clearAllDocumentImages(): void {
-  imageCache.clear();
+export function setDocumentImages(images: DocumentImage[]): void {
+  imageCache = images;
 }

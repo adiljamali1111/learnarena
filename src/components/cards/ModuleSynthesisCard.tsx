@@ -1,21 +1,32 @@
-import { CheckCircle2, Lightbulb } from 'lucide-react';
+import { Lightbulb, ListChecks } from 'lucide-react';
+import type { ModuleSynthesis } from '../../types/dashboard';
 
 interface Props {
-  keyTakeaways: string[];
+  data: ModuleSynthesis;
 }
 
-export default function ModuleSynthesisCard({ keyTakeaways }: Props) {
+export default function ModuleSynthesisCard({ data }: Props) {
   return (
-    <div className="glass-card p-5 animate-fade-in-up">
-      <div className="flex items-center gap-2 mb-3">
-        <Lightbulb className="w-5 h-5 text-gold" />
-        <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Key Takeaways</h3>
+    <div className="glass-card p-6 col-span-full">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
+          <Lightbulb size={18} className="text-primary" />
+        </div>
+        <h3 className="font-heading font-semibold text-lg">Module Synthesis</h3>
       </div>
-      <ul className="space-y-2.5">
-        {keyTakeaways.map((item, i) => (
-          <li key={i} className="flex items-start gap-2.5 text-sm text-foreground/90">
-            <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
-            <span className="leading-relaxed">{item}</span>
+
+      <p className="text-sm text-muted leading-relaxed mb-4">{data.summary}</p>
+
+      <div className="flex items-start gap-2.5 mb-3">
+        <ListChecks size={16} className="text-accent mt-0.5 shrink-0" />
+        <h4 className="text-sm font-semibold text-accent">Key Takeaways</h4>
+      </div>
+
+      <ul className="space-y-2">
+        {data.keyTakeaways.map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-foreground/80">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
+            {item}
           </li>
         ))}
       </ul>

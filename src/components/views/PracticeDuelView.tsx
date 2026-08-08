@@ -1,232 +1,374 @@
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Swords,
+  Timer,
   Heart,
   Zap,
-  Timer,
+  ChevronRight,
   Trophy,
-  Target,
-  RefreshCw,
-  Sparkles,
+  Shield,
+  HelpCircle,
+  X,
+  RotateCcw,
+  Star,
 } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
+import {
+  getComboLabel,
+  getComboLevel,
+  COMBO_COLORS,
+  type ComboLevel,
+} from '../../types/dashboard';
 
 export default function PracticeDuelView() {
-  const { duel, startDuel, answerDuelQuestion, resetDuel, addXp } = useDashboard();
+  const {
+    state,
+    startDuel,
+    answerDuelQuestion,
+    nextDuelQuestion,
+    closeDuelHint,
+    resetDuel,
+  } = useDashboard();
 
-  // Combo label
-  const comboLabel = useMemo(() => {
-    if (duel.combo >= 10) return { text: 'GOLDEN', color: 'text-gold' };
-    if (duel.combo >= 5) return { text: 'PHENOMENAL', color: 'text-primary' };
-    if (duel.combo >= 3) return { text: 'COMBO', color: 'text-accent' };
-    return null;
-  }, [duel.combo]);
+  const { duel } = state;
+  const currentQuestion = duel.questions[duel.currentIndex];
+  const comboLevel = getComboLevel(duel.combo);
+  const comboColor = COMBO_COLORS[comboLevel];
 
-  // ── Idle screen ──
+  /* ===========================
+     IDLE
+     =========================== */
   if (duel.phase === 'idle') {
     return (
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-destructive/20 flex items-center justify-center">
-            <Swords className="w-8 h-8 text-destructive" />
+      <div className="p-4 max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="glass-card p-8 text-center max-w-md animate-fade-in-up">
+          <div className="w-16 h-16 rounded-2xl bg-warning/20 flex items-center justify-center mx-auto mb-4">
+            <Swords size={32} className="text-warning" />
           </div>
-          <h2 className="font-heading text-2xl font-bold text-foreground mb-3">Practice Duel</h2>
+
+          <h2 className="font-heading font-bold text-2xl mb-2 text-glow-cyan">
+            Practice Duel
+          </h2>
           <p className="text-sm text-muted mb-6 leading-relaxed">
-            Face off against RIVAL-9, an AI opponent that learns from the same material.
-            Answer questions correctly to build combos and earn bonus points.
-            <br /><strong className="text-foreground">3 lives. Infinite combos. No repeats.</strong>
+            Face RIVAL-9 in a timed quiz duel. Answer questions faster and more
+            accurately to climb the combo ladder and claim victory!
           </p>
-          <div className="flex items-center justify-center gap-4 mb-6 text-xs text-muted-lighter">
-            <span className="flex items-center gap-1"><Heart className="w-3 h-3 text-destructive" /> 3 Lives</span>
-            <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-gold" /> Combo System</span>
-            <span className="flex items-center gap-1"><Timer className="w-3 h-3 text-accent" /> 15s Timer</span>
+
+          {/* Rules */}
+          <div className="text-left space-y-2 mb-6">
+            {[
+              '15 seconds per question',
+              '3 lives — lose them all and you\'re out',
+              'Build combos: 3x → 5x → 10x → 20x (shield)',
+              'RIVAL-9 answers with 65% accuracy',
+              'Wrong answer or timeout = lost life',
+            ].map((rule, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-muted">
+                <span className="text-accent mt-0.5">•</span>
+                {rule}
+              </div>
+            ))}
           </div>
+
           <button
             onClick={startDuel}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-destructive text-foreground font-heading font-bold text-sm hover:opacity-90 transition-all duration-200 cursor-pointer shadow-lg"
+            disabled={!state.activeModuleId}
+            className="btn-base w-full py-3 rounded-xl bg-gradient-to-r from-warning to-orange-500 text-white font-semibold hover:shadow-glow-purple transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Swords className="w-4 h-4" /> START DUEL
+            {state.activeModuleId ? 'Start Duel' : 'Load a module first'}
+          </button>
+
+          {duel.highScore > 0 && (
+            <p className="text-xs text-muted-lighter mt-3">
+              🏆 High Score: {duel.highScore.toLocaleString()} XP
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ===========================
+     PREPARING
+     =========================== */
+  if (duel.phase === 'preparing') {
+    return (
+      <div className="p-4 max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="glass-card p-8 text-center animate-fade-in-up">
+          <div className="w-12 h-12 rounded-2xl bg-accent/20 flex items-center justify-center mx-auto mb-4">
+            <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          </div>
+          <h2 className="font-heading font-bold text-xl mb-2">Preparing Duel...</h2>
+          <p className="text-sm text-muted">
+            RIVAL-9 is warming up. Generating your questions...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ===========================
+     PLAYING
+     =========================== */
+  if (duel.phase === 'playing' && currentQuestion) {
+    return (
+      <div className="p-4 max-w-2xl mx-auto">
+        {/* Status bar */}
+        <div className="flex items-center gap-3 mb-4">
+          {/* Timer */}
+          <div className="flex items-center gap-1.5 glass-card px-3 py-2">
+            <Timer
+              size={16}
+              className={
+                duel.timeLeft <= 5 ? 'text-destructive animate-pulse' : 'text-accent'
+              }
+            />
+            <span
+              className={`text-sm font-mono font-bold ${
+                duel.timeLeft <= 5 ? 'text-destructive' : 'text-accent'
+              }`}
+            >
+              {duel.timeLeft}s
+            </span>
+          </div>
+
+          {/* Score */}
+          <div className="flex-1 flex items-center justify-center gap-4 text-xs">
+            <span className="text-muted">You: {duel.playerScore}</span>
+            <span className="text-muted-lighter">vs</span>
+            <span className="text-muted">RIVAL-9: {duel.rivalScore}</span>
+          </div>
+
+          {/* Lives */}
+          <div className="flex gap-0.5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Heart
+                key={i}
+                size={16}
+                className={
+                  i < duel.playerLives
+                    ? 'text-destructive'
+                    : 'text-muted-lighter opacity-30'
+                }
+                fill={i < duel.playerLives ? '#ef4444' : 'none'}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Combo display */}
+        {duel.combo >= 3 && (
+          <div className="flex items-center justify-center gap-2 mb-3 animate-combo-pop">
+            <div
+              className="px-3 py-1 rounded-full border text-xs font-bold"
+              style={{
+                borderColor: comboColor,
+                color: comboColor,
+                background: `${comboColor}15`,
+              }}
+            >
+              <span className="flex items-center gap-1">
+                <Zap size={12} />
+                {duel.combo}x Combo — {getComboLabel(duel.combo)}
+                {duel.hasShield && <Shield size={12} className="text-accent" />}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Question card */}
+        <div className="glass-card p-6 animate-fade-in-up">
+          {/* Progress */}
+          <div className="flex gap-1 mb-4">
+            {duel.questions.map((q, i) => (
+              <div
+                key={q.id}
+                className={`flex-1 h-1 rounded-full transition-colors ${
+                  i < duel.currentIndex
+                    ? 'bg-accent'
+                    : i === duel.currentIndex
+                      ? 'bg-primary'
+                      : 'bg-white/10'
+                }`}
+              />
+            ))}
+          </div>
+
+          <p className="text-sm font-semibold text-foreground mb-4 leading-relaxed">
+            {currentQuestion.question}
+          </p>
+
+          {/* Options */}
+          <div className="space-y-2">
+            {currentQuestion.options.map((option, i) => {
+              let borderClass = 'border-glass-border hover:border-accent/40';
+
+              if (duel.isAnswered) {
+                if (i === currentQuestion.correctIndex) {
+                  borderClass = 'border-success bg-success/10';
+                } else if (i === duel.selectedAnswer) {
+                  borderClass = 'border-destructive bg-destructive/10';
+                }
+              } else if (i === duel.selectedAnswer) {
+                borderClass = 'border-accent bg-accent/10';
+              }
+
+              return (
+                <button
+                  key={i}
+                  onClick={() => answerDuelQuestion(i)}
+                  disabled={duel.isAnswered}
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer disabled:cursor-default ${borderClass}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xs text-muted-lighter w-5 shrink-0 mt-0.5 font-mono">
+                      {String.fromCharCode(65 + i)}.
+                    </span>
+                    <span className="text-sm text-foreground/80">{option}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Hint modal */}
+          {duel.isAnswered && duel.selectedAnswer !== currentQuestion.correctIndex && (
+            <div className="mt-4 glass-card p-3 bg-destructive/10 border-destructive/30 animate-fade-in-up">
+              <div className="flex items-start gap-2">
+                <HelpCircle size={16} className="text-destructive mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm text-foreground/80 mb-1">
+                    {currentQuestion.explanation}
+                  </p>
+                  {currentQuestion.distractorsExplanation && (
+                    <p className="text-xs text-muted">
+                      {currentQuestion.distractorsExplanation}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Next button */}
+        {duel.isAnswered && (
+          <button
+            onClick={nextDuelQuestion}
+            className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold hover:shadow-glow-purple transition-all animate-fade-in-up cursor-pointer"
+          >
+            {duel.currentIndex >= duel.questions.length - 1
+              ? 'See Results'
+              : 'Next Question'}
+            <ChevronRight size={16} className="inline ml-1" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  /* ===========================
+     DONE
+     =========================== */
+  const isDraw = duel.playerScore === duel.rivalScore;
+  const playerWon = duel.playerScore > duel.rivalScore;
+  const isNewHighScore = duel.playerScore >= duel.highScore && duel.playerScore > 0;
+
+  return (
+    <div className="p-4 max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[60vh]">
+      <div className="glass-card p-8 text-center max-w-md animate-fade-in-up">
+        {/* Result icon */}
+        <div
+          className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${
+            playerWon
+              ? 'bg-gold/20'
+              : isDraw
+                ? 'bg-accent/20'
+                : 'bg-destructive/20'
+          }`}
+        >
+          <Trophy
+            size={32}
+            className={
+              playerWon
+                ? 'text-gold'
+                : isDraw
+                  ? 'text-accent'
+                  : 'text-destructive'
+            }
+          />
+        </div>
+
+        <h2
+          className={`font-heading font-bold text-2xl mb-2 ${
+            playerWon
+              ? 'text-glow-gold'
+              : isDraw
+                ? 'text-glow-cyan'
+                : 'text-muted'
+          }`}
+        >
+          {playerWon ? 'Victory!' : isDraw ? 'Draw!' : 'Defeated'}
+        </h2>
+
+        <p className="text-sm text-muted mb-6">
+          {playerWon
+            ? 'You outscored RIVAL-9!'
+            : isDraw
+              ? 'You matched RIVAL-9!'
+              : 'RIVAL-9 got you this time.'}
+        </p>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="glass-card p-3">
+            <p className="text-2xl font-bold text-gold">{duel.playerScore}</p>
+            <p className="text-[10px] text-muted-lighter">Your Score</p>
+          </div>
+          <div className="glass-card p-3">
+            <p className="text-2xl font-bold text-destructive">{duel.rivalScore}</p>
+            <p className="text-[10px] text-muted-lighter">RIVAL-9</p>
+          </div>
+          <div className="glass-card p-3">
+            <p className="text-lg font-bold text-accent">
+              {duel.combo}x
+            </p>
+            <p className="text-[10px] text-muted-lighter">Best Combo</p>
+          </div>
+          <div className="glass-card p-3">
+            <p className="text-lg font-bold text-muted">
+              {duel.highScore.toLocaleString()}
+            </p>
+            <p className="text-[10px] text-muted-lighter">High Score</p>
+          </div>
+        </div>
+
+        {/* New high score */}
+        {isNewHighScore && (
+          <div className="flex items-center justify-center gap-1 text-sm text-gold mb-4 animate-combo-golden">
+            <Star size={16} fill="#fbbf24" />
+            New High Score!
+            <Star size={16} fill="#fbbf24" />
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => resetDuel()}
+            className="btn-base flex-1 py-3 rounded-xl bg-white/5 text-muted hover:text-foreground hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            Back to Lobby
+          </button>
+          <button
+            onClick={startDuel}
+            className="btn-base flex-1 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold hover:shadow-glow-purple transition-all cursor-pointer"
+          >
+            <RotateCcw size={14} className="inline mr-1" />
+            Rematch
           </button>
         </div>
       </div>
-    );
-  }
-
-  // ── Preparing ──
-  if (duel.phase === 'preparing') {
-    return (
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted">RIVAL-9 is preparing your questions...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Playing ──
-  if (duel.phase === 'playing') {
-    const q = duel.questions[duel.questionIndex];
-    if (!q) {
-      return (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <p className="text-sm text-muted">No more questions. Loading results...</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex-1 flex flex-col p-4 overflow-y-auto">
-        <div className="max-w-2xl mx-auto w-full space-y-4">
-
-          {/* Score bar */}
-          <div className="glass-card p-4 flex items-center justify-between">
-            <div className="text-center">
-              <p className="text-2xs text-muted-lighter uppercase">You</p>
-              <p className="text-xl font-heading font-bold text-accent">{duel.playerScore}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xs text-muted-lighter uppercase">Lives</p>
-              <div className="flex gap-1 justify-center">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Heart
-                    key={i}
-                    className={`w-4 h-4 ${i < duel.lives ? 'text-destructive' : 'text-muted-lighter'}`}
-                    fill={i < duel.lives ? 'currentColor' : 'none'}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="text-2xs text-muted-lighter uppercase">RIVAL-9</p>
-              <p className="text-xl font-heading font-bold text-destructive">{duel.rivalScore}</p>
-            </div>
-          </div>
-
-          {/* Combo display */}
-          {duel.combo >= 3 && (
-            <div className={`text-center animate-combo-pop ${comboLabel?.color}`}>
-              <span className="font-heading font-bold text-lg">
-                <Zap className="w-4 h-4 inline mr-1" />
-                {comboLabel?.text} x{duel.combo}
-              </span>
-            </div>
-          )}
-
-          {/* Lives indicator (when hit) */}
-          {duel.lives < 3 && (
-            <div className="text-center text-2xs text-muted-lighter">
-              {duel.lives <= 0 ? 'No lives remaining' : `${duel.lives} lives remaining`}
-            </div>
-          )}
-
-          {/* Question */}
-          <div className="glass-card p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-2xs text-muted-lighter">Question {duel.questionIndex + 1} of {duel.questions.length}</span>
-              <span className="text-2xs text-muted-lighter">{q.questionType}</span>
-            </div>
-            <p className="text-sm text-foreground font-medium mb-4">{q.question}</p>
-
-            <div className="space-y-2">
-              {q.options.map((opt, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => answerDuelQuestion(idx)}
-                  className="w-full text-left px-4 py-3 rounded-xl bg-dark-elevated/60 border border-border hover:border-primary/40 text-sm text-foreground transition-all duration-200 cursor-pointer"
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Done ──
-  if (duel.phase === 'done') {
-    const isVictory = duel.result === 'victory';
-    const isDraw = duel.result === 'draw';
-
-    return (
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          {isVictory && (
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-success/20 flex items-center justify-center">
-              <Trophy className="w-8 h-8 text-success" />
-            </div>
-          )}
-          {isDraw && (
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gold/20 flex items-center justify-center">
-              <Target className="w-8 h-8 text-gold" />
-            </div>
-          )}
-          {!isVictory && !isDraw && (
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-destructive/20 flex items-center justify-center">
-              <Swords className="w-8 h-8 text-destructive" />
-            </div>
-          )}
-
-          <h2 className={`font-heading text-2xl font-bold mb-2 ${
-            isVictory ? 'text-success' : isDraw ? 'text-gold' : 'text-destructive'
-          }`}>
-            {isVictory ? 'VICTORY!' : isDraw ? 'DRAW' : 'DEFEAT'}
-          </h2>
-
-          <div className="glass-card p-4 mb-4 space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted">Your Score</span>
-              <span className="text-accent font-bold">{duel.playerScore}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted">RIVAL-9 Score</span>
-              <span className="text-destructive font-bold">{duel.rivalScore}</span>
-            </div>
-            <div className="border-t border-border pt-3 flex justify-between text-sm">
-              <span className="text-muted">Correct Answers</span>
-              <span className="text-foreground">{duel.answerHistory.filter(a => a.correct).length} / {duel.answerHistory.length}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted">Best Combo</span>
-              <span className="text-gold font-bold">x{duel.maxCombo}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted">Best Streak</span>
-              <span className="text-primary font-bold">{duel.bestStreak}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted">Lives Lost</span>
-              <span className="text-destructive">{3 - duel.lives}</span>
-            </div>
-          </div>
-
-          {isVictory && (
-            <p className="text-xs text-gold mb-4">+200 XP earned!</p>
-          )}
-
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={resetDuel}
-              className="px-4 py-2 rounded-xl bg-dark-hover text-muted hover:text-foreground text-xs font-heading font-bold transition-colors cursor-pointer"
-            >
-              BACK TO LOBBY
-            </button>
-            <button
-              onClick={async () => {
-                if (isVictory) addXp(200);
-                await startDuel();
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-dark-base text-xs font-heading font-bold hover:bg-primary-light transition-colors cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> REMATCH
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }

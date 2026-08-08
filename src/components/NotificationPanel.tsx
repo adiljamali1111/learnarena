@@ -1,36 +1,58 @@
-import { X, Bell, Trophy, Swords, Award } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bell, X, Trophy, Sparkles, Info, AlertCircle } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
-import type { AppNotification } from '../types/dashboard';
+import type { Notification } from '../types/dashboard';
 
-const iconMap: Record<AppNotification['type'], typeof Bell> = {
-  streak: Award,
-  duel: Swords,
-  leaderboard: Trophy,
-};
+export default function NotificationPanel() {
+  const { state, clearNotifications, markNotificationRead } = useDashboard();
+  const [isOpen, setIsOpen] = useState(false);
+  const unreadCount = state.notifications.filter((n) => !n.read).length;
 
-export default function NotificationPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { notifications, markNotificationRead, clearNotifications } = useDashboard();
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-notification-panel]')) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isOpen]);
+
+  const getIcon = (type: Notification['type']) => {
+    switch (type) {
+      case 'xp':
+        return <Trophy size={14} className="text-gold" />;
+      case 'achievement':
+        return <Sparkles size={14} className="text-accent" />;
+      case 'info':
+        return <Info size={14} className="text-info" />;
+      case 'error':
+        return <AlertCircle size={14} className="text-destructive" />;
+    }
+  };
 
   return (
-    <>
-      {/* Overlay */}
-      {open && (
-        <div className="fixed inset-0 z-40" onClick={onClose} />
-      )}
-
-      {/* Drawer */}
-      <div
-        className={`fixed top-0 right-0 z-50 h-full w-80 max-w-[90vw] bg-dark-surface border-l border-border transform transition-transform duration-300 ease-out ${
-          open ? 'translate-x-0' : 'translate-x-full'
-        }`}
+    <div className="relative" data-notification-panel>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+        aria-label={`Notifications (${unreadCount} unread)`}
       >
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-primary" />
-            <h2 className="font-heading text-sm font-bold text-foreground">NOTIFICATIONS</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            {notifications.length > 0 && (
+        <Bell size={18} className="text-muted" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-destructive text-white text-[10px] flex items-center justify-center font-bold">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto glass-card p-3 z-50 animate-fade-in-up">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-heading font-semibold">Notifications</h3>
+            {state.notifications.length > 0 && (
               <button
                 onClick={clearNotifications}
                 className="text-xs text-muted hover:text-foreground transition-colors cursor-pointer"
@@ -38,52 +60,41 @@ export default function NotificationPanel({ open, onClose }: { open: boolean; on
                 Clear all
               </button>
             )}
-            <button
-              onClick={onClose}
-              className="p-1 rounded hover:bg-dark-hover text-muted hover:text-foreground transition-colors cursor-pointer"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
           </div>
-        </div>
 
-        <div className="overflow-y-auto h-[calc(100%-60px)]">
-          {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-muted text-sm">
-              <Bell className="w-8 h-8 mb-2 opacity-50" />
-              <p>No notifications yet</p>
-            </div>
+          {state.notifications.length === 0 ? (
+            <p className="text-xs text-muted-lighter text-center py-6">
+              No notifications yet
+            </p>
           ) : (
-            notifications.map((n) => {
-              const Icon = iconMap[n.type];
-              return (
-                <button
+            <div className="space-y-1.5">
+              {state.notifications.map((n) => (
+                <div
                   key={n.id}
                   onClick={() => markNotificationRead(n.id)}
-                  className={`w-full text-left p-4 border-b border-border hover:bg-dark-hover transition-colors cursor-pointer ${
-                    !n.read ? 'bg-dark-elevated/50' : ''
+                  className={`flex items-start gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                    n.read ? 'opacity-50' : 'bg-white/5 hover:bg-white/10'
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <Icon className={`w-4 h-4 mt-0.5 ${
-                      n.type === 'streak' ? 'text-gold' :
-                      n.type === 'duel' ? 'text-destructive' : 'text-primary'
-                    }`} />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{n.title}</p>
-                      <p className="text-xs text-muted mt-0.5">{n.body}</p>
-                      <p className="text-2xs text-muted-lighter mt-1">
-                        {new Date(n.timestamp).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              );
-            })
+                  <span className="mt-0.5 shrink-0">{getIcon(n.type)}</span>
+                  <p className="text-xs text-foreground flex-1 leading-relaxed">
+                    {n.message}
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markNotificationRead(n.id);
+                    }}
+                    className="text-muted-lighter hover:text-foreground shrink-0 cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
 }

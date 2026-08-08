@@ -1,29 +1,52 @@
-const SEEN_KEY = 'learnarena_seen_questions';
+import type { DocumentImage } from '../types/dashboard';
 
-export function getSeenQuestions(): string[] {
+interface SeenQuestion {
+  id: string;
+  moduleId: string;
+}
+
+const STORAGE_KEY = 'learnarena_seen_questions';
+
+function getSeen(): SeenQuestion[] {
   try {
-    const raw = localStorage.getItem(SEEN_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-export function markSeen(questionText: string): void {
-  const seen = getSeenQuestions();
-  if (!seen.includes(questionText)) {
-    seen.push(questionText);
-    localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+function saveSeen(questions: SeenQuestion[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+}
+
+export function isQuestionSeen(questionId: string, moduleId: string): boolean {
+  return getSeen().some((q) => q.id === questionId && q.moduleId === moduleId);
+}
+
+export function markQuestionSeen(questionId: string, moduleId: string): void {
+  const seen = getSeen();
+  if (!seen.some((q) => q.id === questionId && q.moduleId === moduleId)) {
+    seen.push({ id: questionId, moduleId });
+    saveSeen(seen);
   }
 }
 
-export function markManySeen(questions: string[]): void {
-  const seen = getSeenQuestions();
-  const set = new Set(seen);
-  for (const q of questions) set.add(q);
-  localStorage.setItem(SEEN_KEY, JSON.stringify(Array.from(set)));
+export function getUnseenQuestionIds(
+  allIds: string[],
+  moduleId: string,
+): string[] {
+  const seen = getSeen()
+    .filter((q) => q.moduleId === moduleId)
+    .map((q) => q.id);
+  return allIds.filter((id) => !seen.includes(id));
 }
 
-export function clearSeenQuestions(): void {
-  localStorage.removeItem(SEEN_KEY);
+export function clearSeenForModule(moduleId: string): void {
+  const seen = getSeen().filter((q) => q.moduleId !== moduleId);
+  saveSeen(seen);
+}
+
+export function clearAllSeen(): void {
+  localStorage.removeItem(STORAGE_KEY);
 }

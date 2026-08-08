@@ -1,305 +1,262 @@
-// ── OpenRouter API Client ──
-// Uses gpt-4o-mini with response_format: json_object
-
 import type {
   DashboardData,
   DiagnosticQuestion,
-  DenToolKey,
+  DuelQuestion,
+  AudioOverviewData,
+  MindMapData,
+  PresentationData,
+  RecallCardsData,
+  VisualBreakdownData,
+  StudyReportData,
 } from '../types/dashboard';
 
 const API_BASE = 'https://openrouter.ai/api/v1/chat/completions';
-
-// Runtime getter so key can change without re-import
-function getApiKey(): string | null {
-  try {
-    return localStorage.getItem('learnarena_openrouter_key');
-  } catch {
-    return null;
-  }
-}
-
-// ── Error types ──
+const MODEL = 'openai/gpt-4o-mini';
+const APP_TITLE = 'LearnArena';
 
 export class OpenRouterError extends Error {
   constructor(
     message: string,
     public statusCode: number,
+    public code: string,
   ) {
     super(message);
     this.name = 'OpenRouterError';
   }
 }
 
-// ── Generic call ──
+function getAuthHeaders(apiKey: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'HTTP-Referer': window.location.origin,
+    'X-OpenRouter-Title': APP_TITLE,
+  };
+}
 
-async function callOpenRouter(
-  messages: { role: 'system' | 'user' | 'assistant'; content: any }[],
+async function apiCall<T>(
+  apiKey: string,
   systemPrompt: string,
-): Promise<any> {
-  const key = getApiKey();
-  if (!key) throw new OpenRouterError('No API key set — add one in settings', 401);
-
-  const fullMessages = [
-    { role: 'system' as const, content: systemPrompt },
-    ...messages,
+  userMessage: string,
+  imageDataUrls?: string[],
+): Promise<T> {
+  const messages: { role: string; content: unknown }[] = [
+    { role: 'system', content: systemPrompt },
   ];
 
-  const res = await fetch(API_BASE, {
+  if (imageDataUrls && imageDataUrls.length > 0) {
+    const content: { type: string; text?: string; image_url?: { url: string } }[] = [];
+    content.push({ type: 'text', text: userMessage });
+    for (const dataUrl of imageDataUrls) {
+      content.push({ type: 'image_url', image_url: { url: dataUrl } });
+    }
+    messages.push({ role: 'user', content });
+  } else {
+    messages.push({ role: 'user', content: userMessage });
+  }
+
+  const response = await fetch(API_BASE, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'LearnArena',
-    },
+    headers: getAuthHeaders(apiKey),
     body: JSON.stringify({
-      model: 'openai/gpt-4o-mini',
+      model: MODEL,
+      messages,
       response_format: { type: 'json_object' },
-      messages: fullMessages,
+      max_tokens: 4000,
       temperature: 0.7,
-      max_tokens: 8192,
     }),
   });
 
-  if (!res.ok) {
-    if (res.status === 401) throw new OpenRouterError('Invalid API key', 401);
-    if (res.status === 402) throw new OpenRouterError('Insufficient credits', 402);
-    if (res.status === 429) throw new OpenRouterError('Rate limited — try again shortly', 429);
-    throw new OpenRouterError(`Server error (${res.status})`, res.status);
+  if (!response.ok) {
+    const codeMap: Record<number, string> = {
+      401: 'invalid_key',
+      402: 'insufficient_credits',
+      429: 'rate_limited',
+    };
+    const code = codeMap[response.status] || 'server_error';
+    const text = await response.text().catch(() => 'Unknown error');
+    throw new OpenRouterError(
+      `${response.status}: ${text}`,
+      response.status,
+      code,
+    );
   }
 
-  const json = await res.json();
-  const content = json.choices?.[0]?.message?.content;
-  if (!content) throw new OpenRouterError('Empty response from AI', 500);
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new OpenRouterError(
+      'Empty response from OpenRouter',
+      200,
+      'empty_response',
+    );
+  }
 
   try {
-    return JSON.parse(cleanJson(content));
+    return JSON.parse(content) as T;
   } catch {
-    throw new OpenRouterError('AI returned malformed JSON', 500);
+    throw new OpenRouterError(
+      'Failed to parse LLM response as JSON',
+      200,
+      'malformed_json',
+    );
   }
 }
 
-// ── Streaming call (for Tutor / Explain / Brainstorm / Summarize) ──
+/* ===========================
+   System Prompts
+   =========================== */
 
-export async function* streamOpenRouter(
-  messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
-  systemPrompt: string,
-): AsyncGenerator<string> {
-  const key = getApiKey();
-  if (!key) throw new OpenRouterError('No API key set', 401);
+const DASHBOARD_SYSTEM_PROMPT = `You are an expert study assistant. Given raw course notes (and optionally images), generate a comprehensive structured dashboard in JSON. Follow this exact schema:
 
-  const fullMessages = [
-    { role: 'system' as const, content: systemPrompt },
-    ...messages,
-  ];
-
-  const res = await fetch(API_BASE, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'LearnArena',
-    },
-    body: JSON.stringify({
-      model: 'openai/gpt-4o-mini',
-      stream: true,
-      messages: fullMessages,
-      temperature: 0.7,
-      max_tokens: 4096,
-    }),
-  });
-
-  if (!res.ok) {
-    if (res.status === 401) throw new OpenRouterError('Invalid API key', 401);
-    if (res.status === 402) throw new OpenRouterError('Insufficient credits', 402);
-    if (res.status === 429) throw new OpenRouterError('Rate limited', 429);
-    throw new OpenRouterError(`Server error (${res.status})`, res.status);
-  }
-
-  const reader = res.body?.getReader();
-  if (!reader) throw new OpenRouterError('No response body', 500);
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed === 'data: [DONE]') continue;
-      if (!trimmed.startsWith('data: ')) continue;
-
-      try {
-        const parsed = JSON.parse(trimmed.slice(6));
-        const delta = parsed.choices?.[0]?.delta?.content;
-        if (delta) yield delta;
-      } catch {
-        // skip malformed chunks
-      }
+{
+  "moduleTitle": "string — concise title for this module",
+  "moduleSynthesis": {
+    "summary": "string — 3-4 sentence overview",
+    "keyTakeaways": ["string — 5-8 bullet points"]
+  },
+  "coreConcepts": [
+    {
+      "id": "string — unique id",
+      "term": "string — concept name",
+      "definition": "string — clear definition",
+      "analogy": "string — memorable analogy",
+      "xp": "number — 10-50 XP value"
     }
-  }
+  ],
+  "contextMap": {
+    "topic": "string — overall topic",
+    "nodes": [
+      {
+        "id": "string",
+        "label": "string",
+        "description": "string",
+        "category": "root|concept|subtopic|example|related",
+        "importance": "number 1-5"
+      }
+    ],
+    "edges": [
+      {
+        "source": "string — node id",
+        "target": "string — node id",
+        "label": "string — relationship type"
+      }
+    ]
+  },
+  "scenario": {
+    "title": "string — scenario title",
+    "context": "string — 2-3 sentence case study",
+    "options": [
+      {
+        "id": "string",
+        "text": "string — option text",
+        "isCorrect": "boolean",
+        "explanation": "string — why this is right/wrong"
+      }
+    ]
+  },
+  "diagnosticQuestions": [
+    {
+      "id": "string — unique id",
+      "question": "string — MCQ question",
+      "options": ["string — 4 options"],
+      "correctIndex": "number — 0-3",
+      "explanation": "string — full explanation",
+      "topic": "string — topic tag",
+      "difficulty": "easy|medium|hard"
+    }
+  ],
+  "masteryProgress": {
+    "totalXp": "number — total XP from this module (sum of concept XPs + 50 per diagnostic Q)",
+    "level": "number — 1",
+    "streak": "number — 0",
+    "conceptsMastered": "number — count of coreConcepts",
+    "quizzesPassed": "number — 0"
+  },
+  "leaderboard": [
+    {
+      "rank": "number",
+      "name": "string — fun AI persona name",
+      "xp": "number",
+      "avatar": "string — single emoji",
+      "isUser": "boolean — only first entry is true"
+    }
+  ]
 }
 
-// ── Helper ──
+Generate 5-8 core concepts, 8-12 context nodes with edges, exactly 1 scenario with 4 options (one correct), exactly 6-8 diagnostic questions, and exactly 5 leaderboard entries (first is the user). Ensure all IDs are unique. Make the content educational and accurate based on the notes provided.`;
 
-function cleanJson(text: string): string {
-  // Strip markdown code fences if present
-  return text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+const DUEL_QUESTIONS_SYSTEM_PROMPT = `You are a quiz generator. Given study notes, generate unique multiple-choice questions for a timed duel game. Return exactly this JSON structure:
+
+{
+  "questions": [
+    {
+      "id": "string — unique id",
+      "question": "string — question text",
+      "options": ["string — 4 options"],
+      "correctIndex": "number — 0-3",
+      "explanation": "string — brief explanation",
+      "distractorsExplanation": "string — explain why wrong answers are incorrect"
+    }
+  ]
 }
 
-// ── Multi-modal call (text + images) ──
+Generate exactly 12 questions. Each question must test a different concept from the notes. Do NOT repeat questions from the dashboard's diagnosticQuestions. Make them increasingly difficult.`;
 
-function buildImageContent(text: string, images: string[]) {
-  if (images.length === 0) return text;
+const DEN_CONTENT_SYSTEM_PROMPTS: Record<string, string> = {
+  audio:
+    'You are a scriptwriter. Given study notes, generate an audio overview script as JSON:\n{\n  "script": "string — full narrative script (~500 words)",\n  "segments": [\n    { "heading": "string — section heading", "text": "string — section text" }\n  ]\n}\n\nGenerate 4-6 segments with a comprehensive script.',
+  mindmap:
+    'You are a mind map designer. Given study notes, generate a mind map as JSON:\n{\n  "centralTopic": "string — central topic",\n  "branches": [\n    { "label": "string — branch name", "children": ["string — child concept 1", "string — child concept 2"] }\n  ]\n}\n\nGenerate 4-6 branches, each with 2-4 children.',
+  presentation:
+    'You are a slide deck creator. Given study notes, generate slide content as JSON:\n{\n  "slides": [\n    {\n      "title": "string — slide title",\n      "content": "string — 2-3 sentence explanation",\n      "bulletPoints": ["string — 3-5 bullet points"]\n    }\n  ]\n}\n\nGenerate 5-8 slides covering the key concepts.',
+  recall:
+    'You are a flashcard creator. Given study notes, generate recall cards as JSON:\n{\n  "cards": [\n    {\n      "front": "string — question or term",\n      "back": "string — answer or definition",\n      "hint": "string — optional hint"\n    }\n  ]\n}\n\nGenerate 8-12 cards. Front should be a question or term, back should be the answer. Include hints for harder cards.',
+  visual:
+    'You are an infographic designer. Given study notes, generate a visual breakdown as JSON:\n{\n  "title": "string — infographic title",\n  "sections": [\n    {\n      "heading": "string — section title",\n      "icon": "string — single emoji",\n      "items": ["string — 3-5 key points"],\n      "color": "string — hex color like #a855f7"\n    }\n  ]\n}\n\nGenerate 4-6 sections with distinct categories.',
+  report:
+    'You are a test creator. Given study notes, generate a study report as JSON:\n{\n  "objectiveQuestions": [\n    {\n      "question": "string — MCQ question",\n      "options": ["string — 4 options"],\n      "correctIndex": "number — 0-3"\n    }\n  ],\n  "subjectiveQuestions": [\n    {\n      "question": "string — open-ended question",\n      "sampleAnswer": "string — model answer"\n    }\n  ],\n  "glossary": [\n    {\n      "term": "string — key term",\n      "definition": "string — definition"\n    }\n  ]\n}\n\nGenerate 20 objective questions, 5 subjective questions, and 25 glossary entries.',
+};
 
-  const parts: any[] = [{ type: 'text', text }];
-  for (const img of images.slice(0, 4)) {
-    // Only send first 4 images to keep payload manageable
-    parts.push({
-      type: 'image_url',
-      image_url: { url: img, detail: 'low' },
-    });
-  }
-  return parts;
-}
-
-// ── Tool call: generate full Dashboard ──
+/* ===========================
+   Public API
+   =========================== */
 
 export async function generateDashboard(
+  apiKey: string,
   notes: string,
-  images: string[] = [],
+  imageDataUrls?: string[],
 ): Promise<DashboardData> {
-  const systemPrompt = `You are an expert study-content generator. Given a student's notes, produce a JSON object with EXACTLY these keys:
-- "moduleTitle": a concise title for the module (string)
-- "synthesis": { "keyTakeaways": [3-6 bullet-point key takeaways] }
-- "concepts": [ array of 4-7 concept cards, each with "term", "definition", "analogy", "xp" (10-50 integer) ]
-- "contextMap": { "nodes": [ array of { id, label, x (0-1), y (0-1) } ], "edges": [ array of { from, to } ] } — 5-8 nodes showing concept relationships
-- "scenario": { "scenario": "description", "options": [ 3-4 { id, text } ], "correctId": "id of correct option", "explanation": "why correct" }
-- "diagnostic": { "questions": [ 3-5 questions, each with "id", "question", "options" (array of 4 strings), "correctIndex" (0-3), "explanation", "hint" (a Socratic prompt), "questionType" ("mcq"|"true-false"|"fill-in") ] }
-- "mastery": { "totalXp": 0, "streak": 0, "level": 1 }
-- "coworking": { "participants": [ array of 3-4 { name, xp: 0-1000, avatar: single emoji that conveys the person's field } ] }
-
-Return ONLY valid JSON, no markdown, no other text.`;
-
-  const content = buildImageContent(notes, images);
-  const result = await callOpenRouter(
-    [{ role: 'user', content }],
-    systemPrompt,
+  return apiCall<DashboardData>(
+    apiKey,
+    DASHBOARD_SYSTEM_PROMPT,
+    `Generate a study dashboard from these notes:\n\n${notes}`,
+    imageDataUrls,
   );
-
-  return result as DashboardData;
 }
-
-// ── Tool call: fresh questions for diagnostic / duel ──
 
 export async function generateFreshQuestions(
-  moduleTitle: string,
-  sourceText: string,
-  images: string[],
-  excluded: string[],
-  count: number,
-): Promise<DiagnosticQuestion[]> {
-  const systemPrompt = `You are a quiz generator. Create ${count} fresh diagnostic questions from the given study material.
-
-Rules:
-- Each question must have "id" (unique), "question" (string), "options" (array of 4 strings), "correctIndex" (0-3), "explanation" (detailed), "hint" (Socratic prompt), "questionType" ("mcq" | "true-false" | "fill-in").
-- NEVER repeat or rephrase questions from the excluded list.
-- Vary question types (mix mcq, true-false, fill-in).
-- Return ONLY valid JSON with a key "questions" containing the array.`;
-
-  const excludeText = excluded.length
-    ? `\n\nDO NOT include any questions similar to these:\n${excluded.join('\n')}`
-    : '';
-
-  const content = buildImageContent(
-    `Module: ${moduleTitle}\n\nNotes:\n${sourceText.slice(0, 15000)}${excludeText}`,
-    images,
+  apiKey: string,
+  notes: string,
+): Promise<DuelQuestion[]> {
+  const result = await apiCall<{ questions: DuelQuestion[] }>(
+    apiKey,
+    DUEL_QUESTIONS_SYSTEM_PROMPT,
+    `Generate 12 duel questions from these notes:\n\n${notes}`,
   );
-
-  const result = await callOpenRouter(
-    [{ role: 'user', content }],
-    systemPrompt,
-  );
-
-  return (result as { questions: DiagnosticQuestion[] }).questions;
+  return result.questions || [];
 }
 
-// ── Tool call: Den content (typed per tool) ──
-
-export async function generateDenContent(
-  tool: DenToolKey,
-  moduleTitle: string,
-  sourceText: string,
-  images: string[],
-): Promise<any> {
-  const prompts: Record<DenToolKey, string> = {
-    'audio-overview': `Generate an audio overview script for "${moduleTitle}" as JSON with key "sections": [{ "heading": string, "text": string }]. Each section text should be 2-4 sentences suitable for speech synthesis.`,
-    mindmap: `Generate a mind map for "${moduleTitle}" as JSON with keys: "centralTopic" (string), "branches": [{ "label": string, "children": [{ "label": string, "meaning": string }] }]. Aim for 4-6 branches, 2-4 children each.`,
-    presentation: `Generate a slide deck for "${moduleTitle}" as JSON with key "slides": [{ "title": string, "bullets": string[], "note"?: string }]. Aim for 5-8 slides.`,
-    'recall-cards': `Generate flashcard-style recall cards for "${moduleTitle}" as JSON with key "cards": [{ "term": string, "definition": string }]. Aim for 8-15 cards covering key terms.`,
-    'visual-breakdown': `Generate a visual breakdown/infographic for "${moduleTitle}" as JSON with keys: "stats": [{ "label": string, "value": string }], "timeline": [{ "period": string, "event": string }], "sections": [{ "heading": string, "body": string }], "funFact": string.`,
-    'study-report': `Generate a comprehensive study report for "${moduleTitle}" as JSON with keys: "objective": [{ "question": string, "answer": string }] (20 items), "subjective": [{ "question": string, "answer": string }] (5 items), "glossary": [{ "term": string, "definition": string }] (25 items).`,
-  };
-
-  const systemPrompt = prompts[tool] + '\n\nReturn ONLY valid JSON, no markdown.';
-  const content = buildImageContent(
-    `Module: ${moduleTitle}\n\nNotes:\n${sourceText.slice(0, 15000)}`,
-    images,
-  );
-
-  const result = await callOpenRouter(
-    [{ role: 'user', content }],
+export async function generateDenContent<T>(
+  apiKey: string,
+  toolKey: string,
+  notes: string,
+): Promise<T> {
+  const systemPrompt =
+    DEN_CONTENT_SYSTEM_PROMPTS[toolKey] || DEN_CONTENT_SYSTEM_PROMPTS.audio;
+  return apiCall<T>(
+    apiKey,
     systemPrompt,
+    `Generate content for the ${toolKey} tool from these notes:\n\n${notes}`,
   );
-
-  return result;
-}
-
-// ── Streaming text generation (Explain, Summarize, Brainstorm) ──
-
-export async function* generateStreamingText(
-  action: 'explain' | 'summarize' | 'brainstorm',
-  moduleTitle: string,
-  sourceText: string,
-): AsyncGenerator<string> {
-  const prompts: Record<string, string> = {
-    explain: `You are a brilliant tutor. Explain the following study material ("${moduleTitle}") in clear, intuitive terms. Use analogies, break down complex ideas, and connect concepts. Be thorough but engaging.`,
-    summarize: `You are a summarization expert. Produce a concise, well-structured summary of "${moduleTitle}". Include key points, important definitions, and the overall takeaway. Use bullet points for clarity.`,
-    brainstorm: `You are a creative thinking partner. Based on the following material ("${moduleTitle}"), brainstorm related ideas, connections to other fields, thought-provoking questions, and possible research or project directions. Be creative and wide-ranging.`,
-  };
-
-  const systemPrompt = prompts[action] ?? prompts.explain;
-  const snippet = sourceText.slice(0, 12000);
-
-  yield* streamOpenRouter(
-    [{ role: 'user', content: `Here is my study material:\n\n${snippet}` }],
-    systemPrompt,
-  );
-}
-
-// ── Tutor chat ──
-
-export async function* generateTutorResponse(
-  moduleTitle: string,
-  sourceText: string,
-  history: { role: 'user' | 'assistant'; content: string }[],
-  userMessage: string,
-): AsyncGenerator<string> {
-  const systemPrompt = `You are a patient, expert tutor for the module "${moduleTitle}". Help the student understand the material deeply. Use the Socratic method — ask guiding questions rather than giving direct answers when appropriate. Be encouraging and thorough.`;
-
-  const snippet = sourceText.slice(0, 12000);
-  const messages = [
-    { role: 'user' as const, content: `Here is my study material:\n\n${snippet}` },
-    { role: 'assistant' as const, content: 'I have reviewed the material. I am ready to help you learn. What would you like to explore?' },
-    ...history.slice(-10), // keep last 10 messages for context
-    { role: 'user' as const, content: userMessage },
-  ];
-
-  yield* streamOpenRouter(messages, systemPrompt);
 }

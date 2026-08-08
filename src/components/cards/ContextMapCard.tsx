@@ -1,91 +1,241 @@
-import type { ContextMapData } from '../../types/dashboard';
+import { useState, useMemo } from 'react';
+import { Map } from 'lucide-react';
+import type { ContextMap, ContextMapNode, ContextMapEdge } from '../../types/dashboard';
 
 interface Props {
-  data: ContextMapData;
+  data: ContextMap;
 }
 
+const NODE_COLORS: Record<string, string> = {
+  root: '#a855f7',
+  concept: '#00f0ff',
+  subtopic: '#c084fc',
+  example: '#22c55e',
+  related: '#f59e0b',
+};
+
+const NODE_RADIUS = 6;
+
 export default function ContextMapCard({ data }: Props) {
-  const padding = 40;
-  const width = 600;
-  const height = 420;
-  const vw = width - padding * 2;
-  const vh = height - padding * 2;
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  // Compute bounds from actual data points
-  const xs = data.nodes.map((n) => n.x);
-  const ys = data.nodes.map((n) => n.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const rangeX = Math.max(maxX - minX, 0.3);
-  const rangeY = Math.max(maxY - minY, 0.3);
+  // Compute a simple force-directed-ish layout
+  const { nodes, edges } = useMemo(() => {
+    const centerX = 200;
+    const centerY = 120;
+    const radiusBase = 80;
+    const angleStep = (2 * Math.PI) / data.nodes.length;
 
-  const toPixel = (x: number, y: number) => ({
-    px: padding + ((x - minX) / rangeX) * vw,
-    py: padding + ((y - minY) / rangeY) * vh,
-  });
+    const layouted = data.nodes.map((node, i) => {
+      const angle = angleStep * i - Math.PI / 2;
+      const dist = node.category === 'root' ? 0 : radiusBase + node.importance * 12;
+      return {
+        ...node,
+        x: centerX + dist * Math.cos(angle),
+        y: centerY + dist * Math.sin(angle),
+      };
+    });
 
-  // Truncate label
-  const trunc = (s: string) => (s.length > 20 ? s.slice(0, 18) + '…' : s);
+    return { nodes: layouted, edges: data.edges };
+  }, [data]);
+
+  const highlightedNode = selectedNode || hoveredNode;
 
   return (
-    <div className="glass-card p-5 animate-fade-in-up">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="w-5 h-5 flex items-center justify-center text-xs text-accent">⚡</span>
-        <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Context Map</h3>
+    <div className="glass-card p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
+          <Map size={18} className="text-primary" />
+        </div>
+        <div>
+          <h3 className="font-heading font-semibold text-lg">Context Map</h3>
+          <p className="text-xs text-muted-lighter">{data.topic}</p>
+        </div>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" role="img" aria-label="Concept relationship map">
-        {/* Edges */}
-        {data.edges.map((e, i) => {
-          const from = data.nodes.find((n) => n.id === e.from);
-          const to = data.nodes.find((n) => n.id === e.to);
-          if (!from || !to) return null;
-          const { px: x1, py: y1 } = toPixel(from.x, from.y);
-          const { px: x2, py: y2 } = toPixel(to.x, to.y);
-          return (
-            <line
-              key={i}
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke="rgba(168, 85, 247, 0.3)"
-              strokeWidth="1.5"
-              strokeDasharray="4 3"
-            />
-          );
-        })}
 
-        {/* Nodes */}
-        {data.nodes.map((node, i) => {
-          const { px, py } = toPixel(node.x, node.y);
-          return (
-            <g key={node.id}>
-              <circle cx={px} cy={py} r="22" fill="url(#nodeGrad)" stroke="#a855f7" strokeWidth="1.5" />
-              <text
-                x={px}
-                y={py}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="white"
-                fontSize="10"
-                fontFamily="JetBrains Mono, monospace"
-                fontWeight="600"
+      {/* SVG Map */}
+      <div className="relative bg-grid-pattern rounded-xl overflow-hidden">
+        <svg
+          viewBox="0 0 400 250"
+          className="w-full h-auto"
+          style={{ minHeight: 200 }}
+        >
+          {/* Edges */}
+          {edges.map((edge, i) => {
+            const source = nodes.find((n) => n.id === edge.source);
+            const target = nodes.find((n) => n.id === edge.target);
+            if (!source || !target) return null;
+
+            const isHighlighted =
+              highlightedNode === source.id || highlightedNode === target.id;
+
+            return (
+              <g key={`edge-${i}`}>
+                <line
+                  x1={source.x}
+                  y1={source.y}
+                  x2={target.x}
+                  y2={target.y}
+                  stroke={isHighlighted ? '#00f0ff' : 'rgba(255,255,255,0.15)'}
+                  strokeWidth={isHighlighted ? 2 : 1}
+                  className="transition-all duration-300"
+                />
+                <text
+                  x={(source.x + target.x) / 2}
+                  y={(source.y + target.y) / 2 - 6}
+                  textAnchor="middle"
+                  fill="rgba(255,255,255,0.4)"
+                  fontSize="8"
+                >
+                  {edge.label}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Nodes */}
+          {nodes.map((node) => {
+            const isSelected = selectedNode === node.id;
+            const isHovered = hoveredNode === node.id;
+            const isHighlighted = isSelected || isHovered;
+            const isConnected =
+              highlightedNode &&
+              (edges.some(
+                (e) =>
+                  e.source === highlightedNode && e.target === node.id,
+              ) ||
+                edges.some(
+                  (e) =>
+                    e.target === highlightedNode && e.source === node.id,
+                ) ||
+                node.id === highlightedNode);
+
+            return (
+              <g
+                key={node.id}
+                onClick={() =>
+                  setSelectedNode(isSelected ? null : node.id)
+                }
+                onMouseEnter={() => setHoveredNode(node.id)}
+                onMouseLeave={() => setHoveredNode(null)}
+                className="cursor-pointer"
               >
-                {trunc(node.label)}
-              </text>
-            </g>
-          );
-        })}
+                {/* Glow ring */}
+                {(isSelected || isHovered) && (
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={NODE_RADIUS + 4}
+                    fill="none"
+                    stroke={NODE_COLORS[node.category] || '#a855f7'}
+                    strokeWidth={2}
+                    opacity={0.5}
+                    className="animate-pulse-glow"
+                  />
+                )}
 
-        <defs>
-          <radialGradient id="nodeGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#a855f7" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#1a0547" stopOpacity="0.8" />
-          </radialGradient>
-        </defs>
-      </svg>
+                {/* Node circle */}
+                <circle
+                  cx={node.x}
+                  cy={node.y}
+                  r={NODE_RADIUS}
+                  fill={
+                    isConnected
+                      ? NODE_COLORS[node.category] || '#a855f7'
+                      : isHighlighted
+                        ? '#ffffff'
+                        : 'rgba(255,255,255,0.3)'
+                  }
+                  stroke={
+                    isHighlighted
+                      ? NODE_COLORS[node.category] || '#a855f7'
+                      : 'rgba(255,255,255,0.15)'
+                  }
+                  strokeWidth={isHighlighted ? 2 : 1}
+                  className="transition-all duration-200"
+                />
+
+                {/* Label */}
+                <text
+                  x={node.x}
+                  y={node.y + NODE_RADIUS + 12}
+                  textAnchor="middle"
+                  fill={
+                    isConnected
+                      ? '#ffffff'
+                      : isHighlighted
+                        ? '#ffffff'
+                        : 'rgba(255,255,255,0.6)'
+                  }
+                  fontSize="9"
+                  fontWeight={isConnected ? 'bold' : 'normal'}
+                  className="transition-all duration-200"
+                >
+                  {node.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Info panel */}
+        {selectedNode && (
+          <div className="absolute bottom-3 left-3 right-3 glass-card p-3 animate-fade-in-up">
+            {(() => {
+              const node = nodes.find((n) => n.id === selectedNode);
+              if (!node) return null;
+              return (
+                <>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        background:
+                          NODE_COLORS[node.category] || '#a855f7',
+                      }}
+                    />
+                    <span className="text-xs font-semibold text-foreground">
+                      {node.label}
+                    </span>
+                    <span className="text-[10px] text-muted-lighter capitalize">
+                      ({node.category})
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted">{node.description}</p>
+                  <div className="flex items-center gap-1 mt-1.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`text-[10px] ${
+                          i < node.importance
+                            ? 'text-gold'
+                            : 'text-muted-lighter'
+                        }`}
+                      >
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 mt-3 text-[10px] text-muted">
+        {Object.entries(NODE_COLORS).map(([category, color]) => (
+          <span key={category} className="flex items-center gap-1">
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ background: color }}
+            />
+            {category}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
