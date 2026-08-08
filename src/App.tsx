@@ -1,17 +1,20 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ToastProvider, useToast } from './ToastContext';
-import { getModules, getModule } from './store';
+import { getModules, getModule, getApiKey } from './store';
 import type { View } from './types';
-import { Download, BookOpen } from 'lucide-react';
+import { Download, BookOpen, Key } from 'lucide-react';
+import KeyModal from './KeyModal';
 
 function NavBar({
   view,
   onBack,
   onExport,
+  onOpenKeyModal,
 }: {
   view: View;
   onBack: () => void;
   onExport: () => void;
+  onOpenKeyModal: () => void;
 }) {
   return (
     <nav className="sticky top-0 z-40 flex items-center justify-between h-14 px-4 border-b border-border bg-bg-base/95 backdrop-blur-md">
@@ -36,16 +39,26 @@ function NavBar({
         </div>
       </div>
 
-      {view === 'dashboard' && (
+      <div className="flex items-center gap-2">
         <button
-          onClick={onExport}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-bg-elevated hover:bg-bg-hover text-text-muted hover:text-text-primary border border-border transition-all duration-200 cursor-pointer"
-          aria-label="Export modules as JSON"
+          onClick={onOpenKeyModal}
+          className="flex items-center justify-center w-8 h-8 rounded-md text-text-dim hover:text-text-primary hover:bg-bg-hover border border-border transition-all duration-200 cursor-pointer"
+          aria-label="OpenRouter API Key"
+          title="OpenRouter API Key"
         >
-          <Download className="w-4 h-4" />
-          Export JSON
+          <Key className="w-4 h-4" />
         </button>
-      )}
+        {view === 'dashboard' && (
+          <button
+            onClick={onExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-bg-elevated hover:bg-bg-hover text-text-muted hover:text-text-primary border border-border transition-all duration-200 cursor-pointer"
+            aria-label="Export modules as JSON"
+          >
+            <Download className="w-4 h-4" />
+            Export JSON
+          </button>
+        )}
+      </div>
     </nav>
   );
 }
@@ -130,7 +143,15 @@ function ModuleView({ moduleId }: { moduleId: string }) {
 function AppContent() {
   const [view, setView] = useState<View>('dashboard');
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
   const { addToast } = useToast();
+
+  // Prompt for API key on first load if not set
+  useEffect(() => {
+    if (!getApiKey()) {
+      setKeyModalOpen(true);
+    }
+  }, []);
 
   const handleModuleClick = useCallback((id: string) => {
     setActiveModuleId(id);
@@ -162,12 +183,18 @@ function AppContent() {
 
   return (
     <div className="h-dvh flex flex-col bg-bg-base">
-      <NavBar view={view} onBack={handleBack} onExport={handleExport} />
+      <NavBar
+        view={view}
+        onBack={handleBack}
+        onExport={handleExport}
+        onOpenKeyModal={() => setKeyModalOpen(true)}
+      />
       {view === 'dashboard' ? (
         <DashboardView onModuleClick={handleModuleClick} />
       ) : (
         activeModuleId && <ModuleView moduleId={activeModuleId} />
       )}
+      <KeyModal open={keyModalOpen} onClose={() => setKeyModalOpen(false)} />
     </div>
   );
 }

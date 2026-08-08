@@ -76,3 +76,7 @@ export function getApiKey(): string | null {
 export function setApiKey(key: string): void {
   localStorage.setItem(API_KEY_KEY, key);
 }
+
+export function removeApiKey(): void {
+  localStorage.removeItem(API_KEY_KEY);
+}
