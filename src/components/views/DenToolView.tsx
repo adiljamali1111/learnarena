@@ -370,32 +370,33 @@ function RecallCardsTool() {
         </button>
       </div>
 
-      {/* Card */}
-      <div
-        className={`flip-card ${isFlipped ? 'flipped' : ''}`}
-        onClick={() => !isFlipped && setIsFlipped(true)}
-        style={{ minHeight: 280 }}
-      >
-        <div className="flip-card-inner">
-          {/* Front */}
-          <div className="flip-card-front glass-card p-8 flex flex-col items-center justify-center text-center">
-            <span className="text-xs text-muted-lighter mb-4">Click to reveal</span>
-            <p className="text-lg font-semibold leading-relaxed">{card?.front}</p>
-            {card?.hint && !isFlipped && (
-              <p className="text-xs text-muted-lighter mt-4 italic">💡 {card.hint}</p>
-            )}
-          </div>
+      {/* Card — centered wrapper with physical flashcard proportions */}
+      <div className="flex flex-col items-center justify-center w-full my-6">
+        <div
+          className={`flip-card w-full max-w-md mx-auto aspect-[5/3] min-h-[260px] ${isFlipped ? 'flipped' : ''}`}
+          onClick={() => !isFlipped && setIsFlipped(true)}
+        >
+          <div className="flip-card-inner">
+            {/* Front */}
+            <div className="flip-card-front glass-card flex flex-col items-center justify-center p-8 text-center overflow-y-auto max-h-full">
+              <span className="text-xs text-muted-lighter mb-3 shrink-0">Click to reveal</span>
+              <p className="text-base font-semibold leading-relaxed">{card?.front}</p>
+              {card?.hint && !isFlipped && (
+                <p className="text-xs text-muted-lighter mt-3 italic shrink-0">{card.hint}</p>
+              )}
+            </div>
 
-          {/* Back */}
-          <div className="flip-card-back glass-card p-8 flex flex-col items-center justify-center text-center bg-dark-elevated">
-            <span className="text-xs text-success mb-4">Answer</span>
-            <p className="text-lg leading-relaxed text-foreground/90">{card?.back}</p>
+            {/* Back */}
+            <div className="flip-card-back glass-card flex flex-col items-center justify-center p-8 text-center overflow-y-auto max-h-full bg-dark-elevated">
+              <span className="text-xs text-success mb-3 shrink-0">Answer</span>
+              <p className="text-base leading-relaxed text-foreground/90">{card?.back}</p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-center gap-4 mt-4">
+      <div className="flex items-center justify-center gap-4 mt-6">
         <button
           onClick={handlePrev}
           disabled={cardIndex === 0}
