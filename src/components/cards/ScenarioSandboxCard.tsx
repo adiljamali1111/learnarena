@@ -1,36 +1,29 @@
-import { useState } from 'react';
-import { FlaskConical, CheckCircle2, XCircle } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { FlaskConical, Eye, EyeOff, PenLine } from 'lucide-react';
 import type { Scenario } from '../../types/dashboard';
 
 interface Props {
   data: Scenario;
-  onComplete?: (correct: boolean) => void;
 }
 
-export default function ScenarioSandboxCard({ data, onComplete }: Props) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [isRevealed, setIsRevealed] = useState(false);
+export default function ScenarioSandboxCard({ data }: Props) {
+  const [answer, setAnswer] = useState('');
+  const [showModelAnswer, setShowModelAnswer] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSelect = (optionId: string) => {
-    if (isRevealed) return;
-    setSelected(optionId);
-    setIsRevealed(true);
+  const correctOption = data.options.find((o) => o.isCorrect);
 
-    const option = data.options.find((o) => o.id === optionId);
-    if (option && onComplete) {
-      onComplete(option.isCorrect);
+  const handleReveal = () => {
+    if (!showModelAnswer) {
+      setShowModelAnswer(true);
+    } else {
+      setShowModelAnswer(false);
     }
   };
 
-  const handleReset = () => {
-    setSelected(null);
-    setIsRevealed(false);
-  };
-
-  const selectedOption = data.options.find((o) => o.id === selected);
-
   return (
-    <div className="glass-card p-6 flex flex-col">
+    <div className="glass-card p-6 flex flex-col h-full">
+      {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <div className="w-9 h-9 rounded-xl bg-warning/20 flex items-center justify-center">
           <FlaskConical size={18} className="text-warning" />
@@ -38,61 +31,69 @@ export default function ScenarioSandboxCard({ data, onComplete }: Props) {
         <h3 className="font-heading font-semibold text-lg">Scenario Sandbox</h3>
       </div>
 
+      {/* Scenario */}
       <h4 className="text-sm font-semibold text-glow-cyan mb-2">{data.title}</h4>
       <p className="text-sm text-muted leading-relaxed mb-4">{data.context}</p>
 
-      <div className="flex-1 space-y-2">
-        {data.options.map((option) => {
-          const isSelected = selected === option.id;
-          const isCorrectOption = option.isCorrect;
-          let borderClass = 'border-glass-border hover:border-accent/40';
+      {/* Your answer */}
+      <label className="text-xs text-muted-lighter font-medium mb-1.5 flex items-center gap-1.5">
+        <PenLine size={12} />
+        Your response
+      </label>
+      <textarea
+        ref={textareaRef}
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        placeholder="Write your detailed answer here... Apply what you've learned to explain how you'd approach this situation."
+        className="w-full min-h-[140px] px-4 py-3 rounded-xl bg-white/5 border border-glass-border text-foreground placeholder-muted-lighter text-sm focus:outline-none focus:border-accent transition-colors resize-none flex-1"
+      />
 
-          if (isRevealed && isSelected) {
-            borderClass = isCorrectOption
-              ? 'border-success bg-success/10'
-              : 'border-destructive bg-destructive/10';
-          } else if (isRevealed && isCorrectOption) {
-            borderClass = 'border-success/40 bg-success/5';
-          } else if (isSelected) {
-            borderClass = 'border-accent bg-accent/10';
-          }
+      {/* Actions */}
+      <div className="flex items-center gap-3 mt-4 shrink-0">
+        <span className="text-[10px] text-muted-lighter">
+          {answer.length > 0
+            ? `${answer.length} characters`
+            : 'Write your answer then compare with a model response'}
+        </span>
 
-          return (
-            <button
-              key={option.id}
-              onClick={() => handleSelect(option.id)}
-              disabled={isRevealed}
-              className={`w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer disabled:cursor-default ${borderClass}`}
-            >
-              <div className="flex items-start gap-2">
-                {isRevealed && isCorrectOption && (
-                  <CheckCircle2 size={16} className="text-success mt-0.5 shrink-0" />
-                )}
-                {isRevealed && isSelected && !isCorrectOption && (
-                  <XCircle size={16} className="text-destructive mt-0.5 shrink-0" />
-                )}
-                <span className="text-sm text-foreground/80">{option.text}</span>
-              </div>
-            </button>
-          );
-        })}
+        <button
+          onClick={handleReveal}
+          disabled={!correctOption}
+          className="btn-base ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent/10 text-accent text-xs font-semibold hover:bg-accent/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        >
+          {showModelAnswer ? (
+            <>
+              <EyeOff size={14} /> Hide Model Answer
+            </>
+          ) : (
+            <>
+              <Eye size={14} /> Show Model Answer
+            </>
+          )}
+        </button>
       </div>
 
-      {/* Explanation */}
-      {isRevealed && selectedOption && (
-        <div className="mt-4 glass-card p-3 bg-accent/5 border-accent/20 animate-fade-in-up">
-          <p className="text-xs text-muted-lighter mb-1">Explanation</p>
-          <p className="text-sm text-foreground/80">{selectedOption.explanation}</p>
+      {/* Model answer */}
+      {showModelAnswer && correctOption && (
+        <div className="mt-4 glass-card p-4 bg-accent/5 border border-accent/20 rounded-xl animate-fade-in-up shrink-0">
+          <p className="text-xs text-accent font-semibold mb-1.5">Model Answer</p>
+          <p className="text-sm text-foreground/80 leading-relaxed">
+            {correctOption.explanation}
+          </p>
         </div>
       )}
 
-      {/* Retry */}
-      {isRevealed && (
+      {/* Reset */}
+      {answer.length > 0 && (
         <button
-          onClick={handleReset}
-          className="mt-4 text-xs text-accent hover:text-accent/80 transition-colors self-start cursor-pointer"
+          onClick={() => {
+            setAnswer('');
+            setShowModelAnswer(false);
+            textareaRef.current?.focus();
+          }}
+          className="mt-3 text-[10px] text-muted hover:text-foreground transition-colors self-start cursor-pointer shrink-0"
         >
-          Try again →
+          Clear response
         </button>
       )}
     </div>

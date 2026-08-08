@@ -31,7 +31,6 @@ export interface DashboardData {
   scenario: Scenario;
   diagnosticQuestions: DiagnosticQuestion[];
   masteryProgress: MasteryProgress;
-  leaderboard: LeaderboardEntry[];
 }
 
 export interface ModuleSynthesis {
@@ -97,14 +96,6 @@ export interface MasteryProgress {
   streak: number;
   conceptsMastered: number;
   quizzesPassed: number;
-}
-
-export interface LeaderboardEntry {
-  rank: number;
-  name: string;
-  xp: number;
-  avatar: string; // emoji
-  isUser: boolean;
 }
 
 /* ===========================

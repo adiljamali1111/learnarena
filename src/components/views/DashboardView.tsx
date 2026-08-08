@@ -5,7 +5,6 @@ import ContextMapCard from '../cards/ContextMapCard';
 import ScenarioSandboxCard from '../cards/ScenarioSandboxCard';
 import DiagnosticQuestCard from '../cards/DiagnosticQuestCard';
 import MasteryProgressCard from '../cards/MasteryProgressCard';
-import CoWorkingArenaCard from '../cards/CoWorkingArenaCard';
 import { Plus } from 'lucide-react';
 
 export default function DashboardView() {
@@ -112,27 +111,22 @@ export default function DashboardView() {
           <ContextMapCard data={dashboard.contextMap} />
         </div>
 
-        {/* Scenario Sandbox */}
-        <div className="lg:col-span-1">
+        {/* Scenario Sandbox — wider for text input */}
+        <div className="lg:col-span-2">
           <ScenarioSandboxCard data={dashboard.scenario} />
         </div>
 
         {/* Diagnostic Quest */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-1">
           <DiagnosticQuestCard
             data={dashboard.diagnosticQuestions}
             moduleId={activeModule.id}
           />
         </div>
 
-        {/* Mastery Progress */}
-        <div className="lg:col-span-1">
+        {/* Mastery Progress — full width on its row */}
+        <div className="lg:col-span-3">
           <MasteryProgressCard data={dashboard.masteryProgress} />
-        </div>
-
-        {/* Co-Working Arena */}
-        <div className="lg:col-span-2">
-          <CoWorkingArenaCard data={dashboard.leaderboard} />
         </div>
       </div>
     </div>

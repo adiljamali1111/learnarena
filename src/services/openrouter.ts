@@ -169,19 +169,10 @@ const DASHBOARD_SYSTEM_PROMPT = `You are an expert study assistant. Given raw co
     "streak": "number — 0",
     "conceptsMastered": "number — count of coreConcepts",
     "quizzesPassed": "number — 0"
-  },
-  "leaderboard": [
-    {
-      "rank": "number",
-      "name": "string — fun AI persona name",
-      "xp": "number",
-      "avatar": "string — single emoji",
-      "isUser": "boolean — only first entry is true"
-    }
-  ]
+  }
 }
 
-Generate 5-8 core concepts, 8-12 context nodes with edges, exactly 1 scenario with 4 options (one correct), exactly 6-8 diagnostic questions, and exactly 5 leaderboard entries (first is the user). Ensure all IDs are unique. Make the content educational and accurate based on the notes provided.`;
+Generate 5-8 core concepts, 8-12 context nodes with edges, exactly 1 scenario with 4 options (one correct), and exactly 6-8 diagnostic questions. Ensure all IDs are unique. Make the content educational and accurate based on the notes provided.`;
 
 const DUEL_QUESTIONS_SYSTEM_PROMPT = `You are a quiz generator. Given study notes, generate unique multiple-choice questions for a timed duel game. Return exactly this JSON structure:
 
