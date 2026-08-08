@@ -1,50 +1,34 @@
-import { Layers, Star } from "lucide-react";
-import type { CoreConcept } from "../../types/dashboard";
+import { Zap } from 'lucide-react';
+import type { ConceptCard } from '../../types/dashboard';
 
 interface Props {
-  data: CoreConcept[];
+  concepts: ConceptCard[];
 }
 
-export default function CoreConceptDeckCard({ data }: Props) {
-  if (!data?.length) {
-    return (
-      <div className="glass-card p-4">
-        <p className="text-muted-lighter text-sm">No concepts available.</p>
-      </div>
-    );
-  }
-
+export default function CoreConceptDeckCard({ concepts }: Props) {
   return (
-    <div className="glass-card p-4">
+    <div className="glass-card p-5 animate-fade-in-up">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-          <Layers className="w-4 h-4 text-primary-light" />
-        </div>
-        <h3 className="font-heading text-sm font-bold text-foreground tracking-wide">
-          Core Concept Deck
-        </h3>
+        <Zap className="w-5 h-5 text-accent" />
+        <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Core Concepts</h3>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin">
-        {data.map((concept, i) => (
+      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-thin">
+        {concepts.map((c, i) => (
           <div
             key={i}
-            className="min-w-[220px] max-w-[260px] shrink-0 snap-start bg-white/5 border border-white/10 rounded-xl p-4 transition-all duration-200 hover:border-primary/30 hover:shadow-[0_0_12px_rgba(168,85,247,0.1)]"
+            className="min-w-[200px] flex-shrink-0 bg-dark-elevated/60 border border-border rounded-xl p-4 snap-start hover:border-primary/40 transition-colors"
           >
             <div className="flex items-start justify-between mb-2">
-              <h4 className="font-bold text-sm text-foreground">
-                {concept.term}
-              </h4>
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/20 text-primary-light text-[10px] font-semibold shrink-0 ml-2">
-                <Star className="w-2.5 h-2.5" />
-                {concept.xpBadge} XP
+              <h4 className="font-heading text-sm font-bold text-primary-light">{c.term}</h4>
+              <span className="flex items-center gap-0.5 text-2xs text-muted-lighter bg-dark-surface px-1.5 py-0.5 rounded-full">
+                <Zap className="w-2.5 h-2.5 text-gold" /> +{c.xp} XP
               </span>
             </div>
-            <p className="text-xs text-muted leading-relaxed mb-2">
-              {concept.definition}
-            </p>
-            <p className="text-xs text-accent italic leading-relaxed">
-              💡 {concept.analogy}
-            </p>
+            <p className="text-xs text-muted leading-relaxed mb-2">{c.definition}</p>
+            <div className="bg-dark-base/40 rounded-lg p-2.5">
+              <p className="text-2xs text-muted-lighter uppercase tracking-wider mb-0.5">Analogy</p>
+              <p className="text-xs text-foreground/80 italic">{c.analogy}</p>
+            </div>
           </div>
         ))}
       </div>

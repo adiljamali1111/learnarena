@@ -1,132 +1,84 @@
-import { useState } from "react";
-import { FlaskConical, Check, X, RotateCcw } from "lucide-react";
-import type { Scenario } from "../../types/dashboard";
+import { useState } from 'react';
+import { Target, RefreshCw } from 'lucide-react';
+import type { ScenarioCard } from '../../types/dashboard';
 
 interface Props {
-  data: Scenario;
+  data: ScenarioCard;
 }
 
 export default function ScenarioSandboxCard({ data }: Props) {
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ correct: boolean; explanation: string } | null>(null);
 
-  if (!data?.actions?.length) {
-    return (
-      <div className="glass-card p-4">
-        <p className="text-muted-lighter text-sm">No scenario available.</p>
-      </div>
-    );
-  }
-
-  const handleSelect = (index: number) => {
-    if (selectedIndex !== null) return;
-    setSelectedIndex(index);
-    setTimeout(() => setShowFeedback(true), 300);
+  const handleSelect = (id: string) => {
+    setSelectedId(id);
+    setFeedback({
+      correct: id === data.correctId,
+      explanation: data.explanation,
+    });
   };
 
   const handleReset = () => {
-    setSelectedIndex(null);
-    setShowFeedback(false);
+    setSelectedId(null);
+    setFeedback(null);
   };
 
-  const selected = selectedIndex !== null ? data.actions[selectedIndex] : null;
-
   return (
-    <div className="glass-card p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-          <FlaskConical className="w-4 h-4 text-primary-light" />
+    <div className="glass-card p-5 animate-fade-in-up">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Target className="w-5 h-5 text-accent" />
+          <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Scenario Sandbox</h3>
         </div>
-        <h3 className="font-heading text-sm font-bold text-foreground tracking-wide">
-          Scenario Sandbox
-        </h3>
+        {feedback && (
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3 h-3" /> Try Another
+          </button>
+        )}
       </div>
 
-      {/* Setup */}
-      <p className="text-sm text-foreground/90 leading-relaxed mb-3">
-        {data.setup}
-      </p>
+      <div className="bg-dark-elevated/60 border border-border rounded-xl p-4 mb-4">
+        <p className="text-sm text-foreground leading-relaxed">{data.scenario}</p>
+      </div>
 
-      {/* Question */}
-      <p className="text-sm text-accent font-semibold mb-4">
-        {data.question}
-      </p>
-
-      {/* Action buttons */}
       <div className="space-y-2">
-        {data.actions.map((action, i) => {
-          const isSelected = selectedIndex === i;
-          let btnClass =
-            "w-full py-3 px-4 rounded-xl text-sm font-medium text-left transition-all duration-200 cursor-pointer border ";
+        {data.options.map((opt) => {
+          const isSelected = selectedId === opt.id;
+          const isCorrect = opt.id === data.correctId;
+          let btnClass = 'bg-dark-elevated/60 border-border hover:border-primary/40';
 
-          if (isSelected) {
-            if (action.isCorrect) {
-              btnClass +=
-                "bg-success/20 border-success/50 text-success shadow-[0_0_12px_rgba(34,197,94,0.2)]";
-            } else {
-              btnClass +=
-                "bg-destructive/20 border-destructive/50 text-destructive";
-            }
-          } else if (selectedIndex !== null) {
-            btnClass +=
-              "bg-white/5 border-white/10 text-muted cursor-not-allowed";
-          } else {
-            btnClass +=
-              "bg-white/5 border-white/10 text-foreground hover:bg-white/10 hover:border-accent/30";
+          if (feedback) {
+            if (isCorrect) btnClass = 'border-success bg-success/10';
+            else if (isSelected) btnClass = 'border-destructive bg-destructive/10';
           }
 
           return (
             <button
-              key={i}
-              onClick={() => handleSelect(i)}
-              disabled={selectedIndex !== null}
-              className={btnClass}
+              key={opt.id}
+              onClick={() => !feedback && handleSelect(opt.id)}
+              disabled={!!feedback}
+              className={`w-full text-left px-4 py-3 rounded-xl border text-sm text-foreground transition-all duration-200 cursor-pointer disabled:cursor-default ${btnClass}`}
             >
-              <span className="flex items-center gap-3">
-                {isSelected && (
-                  <span className="shrink-0">
-                    {action.isCorrect ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <X className="w-4 h-4" />
-                    )}
-                  </span>
-                )}
-                <span>{action.label}</span>
-              </span>
+              <span className="text-muted-lighter mr-2">{String.fromCharCode(65 + data.options.indexOf(opt))}.</span>
+              {opt.text}
             </button>
           );
         })}
       </div>
 
-      {/* Feedback panel */}
-      <div
-        className={`overflow-hidden transition-all duration-500 ease-in-out ${
-          showFeedback ? "max-h-96 mt-4" : "max-h-0 mt-0"
-        }`}
-      >
-        {selected && (
-          <div className="p-4 rounded-xl bg-white/5 border border-white/10 animate-fade-in-up">
-            <p className="text-sm font-bold mb-2">
-              {selected.isCorrect ? (
-                <span className="text-success">✅ Correct!</span>
-              ) : (
-                <span className="text-destructive">❌ Not quite.</span>
-              )}
-            </p>
-            <p className="text-xs text-muted leading-relaxed mb-3">
-              {selected.explanation}
-            </p>
-            <button
-              onClick={handleReset}
-              className="flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 transition-colors duration-200 cursor-pointer"
-            >
-              <RotateCcw className="w-3 h-3" />
-              Try Another Scenario
-            </button>
-          </div>
-        )}
-      </div>
+      {feedback && (
+        <div className={`mt-4 p-3 rounded-xl text-sm ${
+          feedback.correct ? 'bg-success/10 border border-success/30' : 'bg-destructive/10 border border-destructive/30'
+        }`}>
+          <p className={`font-bold mb-1 ${feedback.correct ? 'text-success' : 'text-destructive'}`}>
+            {feedback.correct ? '✓ Correct!' : '✗ Not quite.'}
+          </p>
+          <p className="text-muted leading-relaxed">{feedback.explanation}</p>
+        </div>
+      )}
     </div>
   );
 }

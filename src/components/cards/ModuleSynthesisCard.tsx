@@ -1,34 +1,21 @@
-import { Lightbulb } from "lucide-react";
-import type { ModuleSynthesis } from "../../types/dashboard";
+import { CheckCircle2, Lightbulb } from 'lucide-react';
 
 interface Props {
-  data: ModuleSynthesis;
+  keyTakeaways: string[];
 }
 
-export default function ModuleSynthesisCard({ data }: Props) {
-  if (!data?.keyTakeaways?.length) {
-    return (
-      <div className="glass-card p-4">
-        <p className="text-muted-lighter text-sm">No takeaways available.</p>
-      </div>
-    );
-  }
-
+export default function ModuleSynthesisCard({ keyTakeaways }: Props) {
   return (
-    <div className="glass-card p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-          <Lightbulb className="w-4 h-4 text-primary-light" />
-        </div>
-        <h3 className="font-heading text-sm font-bold text-foreground tracking-wide">
-          Module Synthesis
-        </h3>
+    <div className="glass-card p-5 animate-fade-in-up">
+      <div className="flex items-center gap-2 mb-3">
+        <Lightbulb className="w-5 h-5 text-gold" />
+        <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Key Takeaways</h3>
       </div>
       <ul className="space-y-2.5">
-        {data.keyTakeaways.map((takeaway, i) => (
-          <li key={i} className="flex items-start gap-2.5 text-sm text-foreground/90 leading-relaxed">
-            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-            {takeaway}
+        {keyTakeaways.map((item, i) => (
+          <li key={i} className="flex items-start gap-2.5 text-sm text-foreground/90">
+            <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
+            <span className="leading-relaxed">{item}</span>
           </li>
         ))}
       </ul>

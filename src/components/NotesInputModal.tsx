@@ -1,210 +1,137 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, X, AlertCircle, Sparkles } from 'lucide-react';
-import { validateFiles, parseFile, ParsedFile, FileParseError } from '../services/fileParser';
-import { FILE_LIMITS } from '../constants';
+import { X, FileText, Upload, Sparkles } from 'lucide-react';
+import { useDashboard } from '../context/DashboardContext';
 
-interface NotesInputModalProps {
-  isOpen: boolean;
+interface Props {
+  open: boolean;
   onClose: () => void;
-  onSubmit: (text: string, images: string[], noteContent: string) => void;
-  onTryDemo: () => void;
-  isGenerating: boolean;
-  error?: string;
 }
 
-export default function NotesInputModal({ isOpen, onClose, onSubmit, onTryDemo, isGenerating, error }: NotesInputModalProps) {
-  const [textInput, setTextInput] = useState('');
-  const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([]);
-  const [errors, setErrors] = useState<FileParseError[]>([]);
-  const [isParsing, setIsParsing] = useState(false);
+export default function NotesInputModal({ open, onClose }: Props) {
+  const [mode, setMode] = useState<'paste' | 'upload'>('paste');
+  const [notes, setNotes] = useState('');
+  const { generateFromNotes, generateFromFiles, isLoading } = useDashboard();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropRef = useRef<HTMLDivElement>(null);
 
-  const handleFiles = useCallback(async (newFiles: FileList | File[]) => {
-    const fileArray = Array.from(newFiles);
-    const { valid, errors: validationErrors } = validateFiles(fileArray);
-    setErrors(validationErrors);
-
-    if (valid.length === 0) return;
-
-    setIsParsing(true);
-
-    try {
-      const results = await Promise.allSettled(valid.map(parseFile));
-      const parsed: ParsedFile[] = [];
-      const parseErrors: FileParseError[] = [];
-
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        if (result.status === 'fulfilled') {
-          parsed.push(result.value);
-        } else {
-          parseErrors.push({
-            fileName: valid[i].name,
-            error: result.reason?.message || 'Failed to parse file',
-          });
-        }
-      }
-
-      setParsedFiles((prev) => [...prev, ...parsed]);
-      setErrors((prev) => [...prev, ...parseErrors]);
-    } finally {
-      setIsParsing(false);
+  const handleGenerate = useCallback(async () => {
+    if (mode === 'paste' && notes.trim()) {
+      await generateFromNotes(notes);
+      onClose();
     }
-  }, []);
+  }, [mode, notes, generateFromNotes, onClose]);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      if (e.dataTransfer.files.length > 0) {
-        handleFiles(e.dataTransfer.files);
-      }
-    },
-    [handleFiles]
-  );
+  const handleFiles = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    await generateFromFiles(files);
+    onClose();
+  }, [generateFromFiles, onClose]);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
-  };
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    await generateFromFiles(files);
+    onClose();
+  }, [generateFromFiles, onClose]);
 
-  const removeFile = (index: number) => {
-    setParsedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = () => {
-    const allText = [
-      textInput,
-      ...parsedFiles.map((pf) => `--- ${pf.fileName} ---\n${pf.text}`),
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-
-    const allImages = parsedFiles.flatMap((pf) => pf.images).slice(0, 10);
-
-    if (!allText.trim()) return;
-
-    onSubmit(allText, allImages, textInput || parsedFiles[0]?.fileName || 'Untitled');
-  };
-
-  if (!isOpen) return null;
+  if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-overlay animate-fade-in">
-      <div className="dark-glass rounded-xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto animate-scale-in">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="font-heading text-xl text-text-primary">Import Your Notes</h2>
-          <button onClick={onClose} className="glass-button-ghost p-2 rounded-lg" disabled={isGenerating}>
-            <X size={20} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-lg p-6 animate-fade-in-up">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-heading text-lg font-bold text-foreground">Import Study Material</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-dark-hover text-muted hover:text-foreground transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm flex items-start gap-3">
-            <AlertCircle size={18} className="mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium mb-1">Generation failed</p>
-              <p>{error}</p>
-              <p className="mt-2 text-text-muted">
-                Try pasting different text, or use the demo below to explore the app right away.
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="mb-6">
-          <label className="text-text-secondary text-sm mb-2 block">Paste your notes here</label>
-          <textarea
-            value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            placeholder="Paste lecture notes, study material, or any text content..."
-            className="glass-input w-full h-32 resize-none p-4 text-sm"
-            disabled={isGenerating}
-          />
-        </div>
-
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 h-px bg-border-glass" />
-          <span className="text-text-muted text-xs font-heading">OR</span>
-          <div className="flex-1 h-px bg-border-glass" />
-        </div>
-
-        <div
-          ref={dropRef}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          className="border-2 border-dashed border-border-glass rounded-xl p-8 text-center cursor-pointer
-            hover:border-primary/50 hover:bg-bg-card-hover transition-all duration-200"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload size={36} className="mx-auto mb-3 text-text-muted" />
-          <p className="text-text-secondary text-sm mb-1">
-            Drop files here or click to browse
-          </p>
-          <p className="text-text-muted text-xs">
-            PDF, DOCX, PPTX, TXT, MD — up to {FILE_LIMITS.maxFiles} files, {FILE_LIMITS.maxSizeMB}MB total
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".pdf,.docx,.pptx,.txt,.md"
-            className="hidden"
-            onChange={(e) => e.target.files && handleFiles(e.target.files)}
-            disabled={isGenerating}
-          />
-        </div>
-
-        {parsedFiles.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {parsedFiles.map((pf, i) => (
-              <div key={i} className="flex items-center gap-3 bg-bg-elevated rounded-lg p-3">
-                <FileText size={18} className="text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-text-primary text-sm truncate">{pf.fileName}</p>
-                  <p className="text-text-muted text-xs">
-                    {pf.text.length} chars · {pf.images.length} images
-                  </p>
-                </div>
-                <button
-                  onClick={() => removeFile(i)}
-                  className="glass-button-ghost p-1 rounded shrink-0"
-                  disabled={isGenerating}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {errors.length > 0 && (
-          <div className="mt-4 space-y-1">
-            {errors.map((e, i) => (
-              <div key={i} className="flex items-start gap-2 text-danger text-xs">
-                <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                <span>{e.fileName}: {e.error}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-3 mt-6">
+        {/* Mode tabs */}
+        <div className="flex gap-1 mb-4 bg-dark-elevated rounded-lg p-1">
           <button
-            onClick={handleSubmit}
-            disabled={(!textInput.trim() && parsedFiles.length === 0) || isGenerating || isParsing}
-            className="glass-button flex-1 py-3 font-heading tracking-wider"
+            onClick={() => setMode('paste')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-heading transition-all cursor-pointer ${
+              mode === 'paste'
+                ? 'bg-primary text-dark-base font-bold'
+                : 'text-muted hover:text-foreground'
+            }`}
           >
-            {isGenerating || isParsing ? 'Processing...' : 'GENERATE STUDY UNIVERSE'}
+            <FileText className="w-3.5 h-3.5" /> PASTE NOTES
           </button>
           <button
-            onClick={onTryDemo}
-            disabled={isGenerating}
-            className="glass-button-ghost px-5 py-3 font-heading tracking-wider text-sm flex items-center justify-center gap-2"
+            onClick={() => setMode('upload')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-heading transition-all cursor-pointer ${
+              mode === 'upload'
+                ? 'bg-primary text-dark-base font-bold'
+                : 'text-muted hover:text-foreground'
+            }`}
           >
-            <Sparkles size={16} />
-            TRY DEMO
+            <Upload className="w-3.5 h-3.5" /> UPLOAD FILES
           </button>
         </div>
+
+        {/* Paste mode */}
+        {mode === 'paste' && (
+          <div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Paste your notes, lecture transcripts, or study material here..."
+              className="w-full h-44 bg-dark-elevated border border-border rounded-lg p-3 text-sm text-foreground placeholder:text-muted-lighter resize-none focus:outline-none focus:border-primary transition-colors font-mono"
+            />
+            <button
+              onClick={handleGenerate}
+              disabled={!notes.trim() || isLoading}
+              className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-dark-base font-heading font-bold text-sm tracking-wider hover:bg-primary-light transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-dark-base border-t-transparent rounded-full animate-spin" />
+                  Generating...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" /> GENERATE STUDY UNIVERSE
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Upload mode */}
+        {mode === 'upload' && (
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center cursor-pointer transition-colors"
+          >
+            <Upload className="w-10 h-10 mx-auto mb-3 text-muted" />
+            <p className="text-sm text-muted mb-1">Drop files here or click to browse</p>
+            <p className="text-xs text-muted-lighter">PDF, DOCX, PPTX, TXT, MD — Max 15 MB each, 6 files</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.pptx,.txt,.md"
+              onChange={handleFiles}
+              className="hidden"
+            />
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-muted">
+            <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            Processing your material...
+          </div>
+        )}
       </div>
     </div>
   );

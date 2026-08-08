@@ -1,233 +1,169 @@
-import { useState, useCallback } from "react";
-import { Target, Check, X, RotateCcw, Sparkles } from "lucide-react";
-import type { DiagnosticQuest } from "../../types/dashboard";
+import { useState, useMemo } from 'react';
+import { BrainCircuit, HelpCircle, ChevronRight } from 'lucide-react';
+import type { DiagnosticQuestion, DiagnosticCard } from '../../types/dashboard';
 
 interface Props {
-  data: DiagnosticQuest;
-  onXpGained?: (xp: number) => void;
+  data: DiagnosticCard;
+  onRefresh?: () => void;
+  onXpEarned?: (xp: number) => void;
 }
 
-export default function DiagnosticQuestCard({ data, onXpGained }: Props) {
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export default function DiagnosticQuestCard({ data, onRefresh, onXpEarned }: Props) {
+  const [shuffledQuestions] = useState(() => shuffleArray(data.questions));
   const [currentQ, setCurrentQ] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [showHint, setShowHint] = useState(false);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [questionsAnswered, setQuestionsAnswered] = useState<boolean[]>([]);
-  const [showSummary, setShowSummary] = useState(false);
-  const [xpEarned, setXpEarned] = useState(0);
+  const [answers, setAnswers] = useState<{ correct: boolean }[]>([]);
+  const [finished, setFinished] = useState(false);
 
-  if (!data?.questions?.length) {
-    return (
-      <div className="glass-card p-4">
-        <p className="text-muted-lighter text-sm">No questions available.</p>
-      </div>
-    );
-  }
-
-  const questions = data.questions;
-  const total = questions.length;
-  const question = questions[currentQ];
-
-  const handleSelect = useCallback(
-    (index: number) => {
-      if (selectedIndex !== null) return;
-      setSelectedIndex(index);
-
-      const isCorrect = index === question.correctIndex;
-      const newAnswered = [...questionsAnswered];
-      newAnswered[currentQ] = isCorrect;
-      setQuestionsAnswered(newAnswered);
-
-      if (isCorrect) {
-        const earned = 10;
-        setCorrectCount((c) => c + 1);
-        setXpEarned((x) => x + earned);
-
-        // Auto-advance after delay
-        setTimeout(() => {
-          if (currentQ < total - 1) {
-            setCurrentQ((q) => q + 1);
-            setSelectedIndex(null);
-            setShowHint(false);
-          } else {
-            setShowSummary(true);
-          }
-        }, 1500);
-      } else {
-        setShowHint(true);
-      }
-    },
-    [currentQ, question, questionsAnswered, total, selectedIndex]
+  const question = shuffledQuestions[currentQ];
+  const shuffledOptions = useMemo(
+    () => (question ? shuffleArray(question.options.map((opt, i) => ({ text: opt, origIndex: i }))) : []),
+    [question],
   );
 
-  const handleRetry = () => {
-    setSelectedIndex(null);
-    setShowHint(false);
+  const handleSelect = (idx: number) => {
+    if (selectedIndex !== null) return;
+    setSelectedIndex(idx);
+
+    const correct = shuffledOptions[idx].origIndex === question.correctIndex;
+    const newAnswers = [...answers, { correct }];
+    setAnswers(newAnswers);
+
+    if (correct) {
+      onXpEarned?.(25);
+      setTimeout(() => {
+        if (currentQ < shuffledQuestions.length - 1) {
+          setCurrentQ((q) => q + 1);
+          setSelectedIndex(null);
+          setShowHint(false);
+        } else {
+          setFinished(true);
+        }
+      }, 800);
+    } else {
+      setShowHint(true);
+    }
   };
 
-  const handleRetryAll = () => {
-    setCurrentQ(0);
-    setSelectedIndex(null);
-    setShowHint(false);
-    setCorrectCount(0);
-    setQuestionsAnswered([]);
-    setShowSummary(false);
-    setXpEarned(0);
-  };
+  const correctCount = answers.filter((a) => a.correct).length;
+  const totalCorrect = answers.length > 0 ? correctCount : 0;
+  const totalAnswered = answers.length;
 
-  // Summary screen
-  if (showSummary) {
+  if (finished) {
     return (
-      <div className="glass-card p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Target className="w-4 h-4 text-primary-light" />
-          </div>
-          <h3 className="font-heading text-sm font-bold text-foreground tracking-wide">
-            Diagnostic Quest
-          </h3>
+      <div className="glass-card p-5 animate-fade-in-up">
+        <div className="flex items-center gap-2 mb-3">
+          <BrainCircuit className="w-5 h-5 text-primary" />
+          <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Diagnostic Quest — Complete</h3>
         </div>
-        <div className="text-center py-6 animate-fade-in-up">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent/60 flex items-center justify-center mx-auto mb-4">
-            <Sparkles className="w-7 h-7 text-white" />
-          </div>
-          <p className="font-heading text-lg font-bold text-foreground mb-2">
-            Quest Complete!
-          </p>
-          <p className="text-3xl font-bold text-accent mb-1">
-            {correctCount} / {total}
-          </p>
-          <p className="text-sm text-muted mb-1">Questions Correct</p>
-          <p className="text-sm text-gold font-semibold mb-5">
-            +{xpEarned} XP Earned
-          </p>
-          <button
-            onClick={handleRetryAll}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary/20 text-primary-light hover:bg-primary/30 border border-primary/30 transition-all duration-200 cursor-pointer mx-auto text-sm font-medium"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Retry Quest
-          </button>
+        <div className="text-center py-6">
+          <p className="text-3xl font-heading font-bold text-primary mb-2">{totalCorrect}/{shuffledQuestions.length}</p>
+          <p className="text-sm text-muted mb-4">Questions answered correctly</p>
+          <p className="text-xs text-gold">+{totalCorrect * 25} XP earned</p>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="mt-4 px-4 py-2 rounded-xl bg-primary text-dark-base text-xs font-heading font-bold hover:bg-primary-light transition-colors cursor-pointer"
+            >
+              GENERATE FRESH QUESTIONS
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
+  if (!question) return null;
+
   return (
-    <div className="glass-card p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-          <Target className="w-4 h-4 text-primary-light" />
+    <div className="glass-card p-5 animate-fade-in-up">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <BrainCircuit className="w-5 h-5 text-primary" />
+          <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Diagnostic Quest</h3>
         </div>
-        <h3 className="font-heading text-sm font-bold text-foreground tracking-wide">
-          Diagnostic Quest
-        </h3>
+        <span className="text-2xs text-muted-lighter">{currentQ + 1} / {shuffledQuestions.length}</span>
       </div>
 
-      {/* Step indicator */}
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-xs text-muted">
-          Question {currentQ + 1} of {total}
-        </span>
-        <div className="flex items-center gap-1.5">
-          {questions.map((_, i) => (
-            <div
-              key={i}
-              className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                i === currentQ
-                  ? "bg-accent shadow-[0_0_6px_rgba(0,240,255,0.5)]"
-                  : questionsAnswered[i] === true
-                  ? "bg-success"
-                  : questionsAnswered[i] === false
-                  ? "bg-destructive"
-                  : "bg-white/20"
-              }`}
-            />
-          ))}
-        </div>
+      {/* Progress dots */}
+      <div className="flex gap-1 mb-4">
+        {shuffledQuestions.map((_, i) => (
+          <div
+            key={i}
+            className={`flex-1 h-1 rounded-full transition-colors ${
+              i < currentQ ? 'bg-success' : i === currentQ ? 'bg-primary' : 'bg-dark-hover'
+            }`}
+          />
+        ))}
       </div>
 
-      {/* Question */}
-      <p className="text-sm font-semibold text-foreground mb-4 leading-relaxed">
-        {question.question}
-      </p>
+      <p className="text-sm text-foreground font-medium mb-4 leading-relaxed">{question.question}</p>
 
-      {/* Options */}
-      <div className="space-y-2 mb-4">
-        {question.options.map((option, i) => {
-          const labels = ["A", "B", "C", "D"];
-          const isSelected = selectedIndex === i;
-          const isCorrectOption = i === question.correctIndex;
+      <div className="space-y-2">
+        {shuffledOptions.map((opt, idx) => {
+          const isSelected = selectedIndex === idx;
+          const isCorrect = opt.origIndex === question.correctIndex;
+          let btnClass = 'bg-dark-elevated/60 border-border hover:border-primary/40';
 
-          let btnClass =
-            "w-full py-2.5 px-3 rounded-xl text-xs font-medium text-left transition-all duration-200 cursor-pointer border flex items-center gap-3 ";
-
-          if (isSelected) {
-            if (isCorrectOption) {
-              btnClass +=
-                "bg-success/20 border-success/50 text-success";
-            } else {
-              btnClass +=
-                "bg-destructive/20 border-destructive/50 text-destructive";
-            }
-          } else if (selectedIndex !== null && isCorrectOption) {
-            // Reveal correct answer after selection
-            btnClass +=
-              "bg-success/20 border-success/50 text-success";
-          } else if (selectedIndex !== null) {
-            btnClass +=
-              "bg-white/5 border-white/10 text-muted cursor-not-allowed";
-          } else {
-            btnClass +=
-              "bg-white/5 border-white/10 text-foreground hover:bg-white/10 hover:border-accent/30";
+          if (selectedIndex !== null) {
+            if (isCorrect) btnClass = 'border-success bg-success/10';
+            else if (isSelected) btnClass = 'border-destructive bg-destructive/10';
           }
 
           return (
             <button
-              key={i}
-              onClick={() => handleSelect(i)}
+              key={idx}
+              onClick={() => handleSelect(idx)}
               disabled={selectedIndex !== null}
-              className={btnClass}
+              className={`w-full text-left px-4 py-3 rounded-xl border text-sm text-foreground transition-all duration-200 cursor-pointer disabled:cursor-default ${btnClass}`}
             >
-              <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold shrink-0">
-                {labels[i]}
-              </span>
-              <span>{option}</span>
-              {isSelected && (
-                <span className="ml-auto shrink-0">
-                  {isCorrectOption ? (
-                    <Check className="w-3.5 h-3.5" />
-                  ) : (
-                    <X className="w-3.5 h-3.5" />
-                  )}
-                </span>
-              )}
+              {opt.text}
             </button>
           );
         })}
       </div>
 
-      {/* Socratic Hint Panel */}
-      <div
-        className={`overflow-hidden transition-all duration-500 ease-in-out ${
-          showHint ? "max-h-48" : "max-h-0"
-        }`}
-      >
-        <div className="p-3 rounded-xl bg-white/5 border border-white/10 animate-fade-in-up">
-          <p className="text-[11px] text-accent font-semibold mb-1">
-            💡 Socratic Hint
-          </p>
-          <p className="text-xs text-muted leading-relaxed mb-2">
-            {question.socraticHint}
-          </p>
+      {/* Hint */}
+      {showHint && (
+        <div className="mt-4 p-3 rounded-xl bg-accent/10 border border-accent/30">
+          <div className="flex items-center gap-1.5 mb-1">
+            <HelpCircle className="w-4 h-4 text-accent" />
+            <span className="text-xs font-bold text-accent">Hint</span>
+          </div>
+          <p className="text-xs text-muted leading-relaxed">{question.hint}</p>
           <button
-            onClick={handleRetry}
-            className="text-xs text-accent hover:text-accent/80 transition-colors duration-200 cursor-pointer"
+            onClick={() => {
+              setShowHint(false);
+              if (currentQ < shuffledQuestions.length - 1) {
+                setCurrentQ((q) => q + 1);
+                setSelectedIndex(null);
+              } else {
+                setFinished(true);
+              }
+            }}
+            className="mt-2 flex items-center gap-1 text-xs text-primary hover:text-primary-light transition-colors cursor-pointer"
           >
-            Try again →
+            Continue <ChevronRight className="w-3 h-3" />
           </button>
         </div>
-      </div>
+      )}
+
+      {/* Explanation on answered */}
+      {selectedIndex !== null && (
+        <div className="mt-4 p-3 rounded-xl bg-dark-elevated/60 border border-border">
+          <p className="text-xs text-muted leading-relaxed">{question.explanation}</p>
+        </div>
+      )}
     </div>
   );
 }

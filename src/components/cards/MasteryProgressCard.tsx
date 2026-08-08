@@ -1,54 +1,55 @@
-import { Trophy, Flame } from "lucide-react";
-import type { MasteryProgress } from "../../types/dashboard";
+import { Trophy, Zap, Flame } from 'lucide-react';
+import type { MasteryCard } from '../../types/dashboard';
 
 interface Props {
-  data: MasteryProgress;
+  data: MasteryCard;
+  totalXp: number;
+  level: number;
 }
 
-export default function MasteryProgressCard({ data }: Props) {
-  if (!data) {
-    return (
-      <div className="glass-card p-4">
-        <p className="text-muted-lighter text-sm">No progress data available.</p>
-      </div>
-    );
-  }
+export default function MasteryProgressCard({ data, totalXp: _totalXp, level: _level }: Props) {
+  const xp = _totalXp || data.totalXp;
+  const lvl = _level || data.level;
+  const xpForNext = lvl * 500;
+  const progress = Math.min(xp / xpForNext, 1);
 
-  const progressPct = Math.min(
-    Math.round((data.currentXp / data.maxXp) * 100),
-    100
-  );
+  const streak = data.streak || 0;
 
   return (
-    <div className="glass-card p-4">
+    <div className="glass-card p-5 animate-fade-in-up">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-          <Trophy className="w-4 h-4 text-primary-light" />
-        </div>
-        <h3 className="font-heading text-sm font-bold text-foreground tracking-wide">
-          Mastery Progress
-        </h3>
+        <Trophy className="w-5 h-5 text-gold" />
+        <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Mastery Progress</h3>
       </div>
 
-      {/* XP Bar */}
+      {/* Level */}
+      <div className="text-center mb-4">
+        <p className="text-4xl font-heading font-bold text-primary-light">{lvl}</p>
+        <p className="text-xs text-muted-lighter mt-0.5">Current Level</p>
+      </div>
+
+      {/* XP bar */}
       <div className="mb-3">
-        <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
+        <div className="flex justify-between text-xs mb-1">
+          <span className="text-muted">XP</span>
+          <span className="text-muted">{xp} / {xpForNext}</span>
+        </div>
+        <div className="h-2 bg-dark-hover rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-accent to-primary transition-all duration-700 ease-out"
-            style={{ width: `${progressPct}%` }}
+            className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+            style={{ width: `${progress * 100}%` }}
           />
         </div>
-        <p className="text-xs text-muted mt-1.5">
-          {data.currentXp} / {data.maxXp} XP
-        </p>
       </div>
 
       {/* Streak */}
-      <div className="flex items-center gap-2">
-        <Flame className="w-4 h-4 text-orange" />
-        <span className="text-sm font-semibold text-orange">
-          {data.streak} day streak
+      <div className="flex items-center justify-center gap-2 pt-2 border-t border-border">
+        <Flame className={`w-4 h-4 ${streak > 0 ? 'text-gold' : 'text-muted-lighter'}`} />
+        <span className={`text-sm font-medium ${streak > 0 ? 'text-gold' : 'text-muted'}`}>
+          {streak} day streak
         </span>
+        <Zap className="w-3.5 h-3.5 text-gold ml-2" />
+        <span className="text-xs text-muted">+{xp} total</span>
       </div>
     </div>
   );

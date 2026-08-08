@@ -1,119 +1,89 @@
-import { Share2 } from "lucide-react";
-import type { ContextMapNode } from "../../types/dashboard";
+import type { ContextMapData } from '../../types/dashboard';
 
 interface Props {
-  data: ContextMapNode[];
+  data: ContextMapData;
 }
 
 export default function ContextMapCard({ data }: Props) {
-  if (!data?.length) {
-    return (
-      <div className="glass-card p-4">
-        <p className="text-muted-lighter text-sm">No context map available.</p>
-      </div>
-    );
-  }
+  const padding = 40;
+  const width = 600;
+  const height = 420;
+  const vw = width - padding * 2;
+  const vh = height - padding * 2;
 
-  // Find bounds for responsive scaling
-  const margin = 40;
-  const minX = Math.min(...data.map((n) => n.x)) - margin;
-  const maxX = Math.max(...data.map((n) => n.x)) + margin;
-  const minY = Math.min(...data.map((n) => n.y)) - margin;
-  const maxY = Math.max(...data.map((n) => n.y)) + margin;
-  const rangeX = maxX - minX || 1;
-  const rangeY = maxY - minY || 1;
+  // Compute bounds from actual data points
+  const xs = data.nodes.map((n) => n.x);
+  const ys = data.nodes.map((n) => n.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const rangeX = Math.max(maxX - minX, 0.3);
+  const rangeY = Math.max(maxY - minY, 0.3);
 
-  // Scale to fit in a viewBox
-  const viewW = 500;
-  const viewH = 350;
-  const scaleX = viewW / rangeX;
-  const scaleY = viewH / rangeY;
+  const toPixel = (x: number, y: number) => ({
+    px: padding + ((x - minX) / rangeX) * vw,
+    py: padding + ((y - minY) / rangeY) * vh,
+  });
 
-  const scale = (val: number, min: number, range: number, size: number) =>
-    ((val - min) / range) * size;
+  // Truncate label
+  const trunc = (s: string) => (s.length > 20 ? s.slice(0, 18) + '…' : s);
 
   return (
-    <div className="glass-card p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-          <Share2 className="w-4 h-4 text-primary-light" />
-        </div>
-        <h3 className="font-heading text-sm font-bold text-foreground tracking-wide">
-          Context Map
-        </h3>
+    <div className="glass-card p-5 animate-fade-in-up">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-5 h-5 flex items-center justify-center text-xs text-accent">⚡</span>
+        <h3 className="font-heading text-xs text-muted-lighter uppercase tracking-widest">Context Map</h3>
       </div>
-      <svg
-        viewBox={`0 0 ${viewW} ${viewH}`}
-        className="w-full h-auto"
-        style={{ minHeight: 200 }}
-      >
-        {/* Connector lines */}
-        {data.map((node) =>
-          node.connections.map((targetId) => {
-            const target = data.find((n) => n.id === targetId);
-            if (!target) return null;
-            return (
-              <line
-                key={`${node.id}-${targetId}`}
-                x1={scale(node.x, minX, rangeX, viewW)}
-                y1={scale(node.y, minY, rangeY, viewH)}
-                x2={scale(target.x, minX, rangeX, viewW)}
-                y2={scale(target.y, minY, rangeY, viewH)}
-                stroke="rgba(0, 240, 255, 0.25)"
-                strokeWidth={1.5}
-                strokeDasharray="4 3"
-              />
-            );
-          })
-        )}
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" role="img" aria-label="Concept relationship map">
+        {/* Edges */}
+        {data.edges.map((e, i) => {
+          const from = data.nodes.find((n) => n.id === e.from);
+          const to = data.nodes.find((n) => n.id === e.to);
+          if (!from || !to) return null;
+          const { px: x1, py: y1 } = toPixel(from.x, from.y);
+          const { px: x2, py: y2 } = toPixel(to.x, to.y);
+          return (
+            <line
+              key={i}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke="rgba(168, 85, 247, 0.3)"
+              strokeWidth="1.5"
+              strokeDasharray="4 3"
+            />
+          );
+        })}
 
         {/* Nodes */}
-        {data.map((node) => {
-          const cx = scale(node.x, minX, rangeX, viewW);
-          const cy = scale(node.y, minY, rangeY, viewH);
+        {data.nodes.map((node, i) => {
+          const { px, py } = toPixel(node.x, node.y);
           return (
             <g key={node.id}>
-              {/* Glow halo */}
-              <circle
-                cx={cx}
-                cy={cy}
-                r={22}
-                fill="rgba(168, 85, 247, 0.15)"
-                className="animate-pulse-glow"
-              />
-              {/* Main circle */}
-              <circle
-                cx={cx}
-                cy={cy}
-                r={18}
-                fill="url(#nodeGrad)"
-                stroke="rgba(168, 85, 247, 0.5)"
-                strokeWidth={1.5}
-              />
-              {/* Label */}
+              <circle cx={px} cy={py} r="22" fill="url(#nodeGrad)" stroke="#a855f7" strokeWidth="1.5" />
               <text
-                x={cx}
-                y={cy}
+                x={px}
+                y={py}
                 textAnchor="middle"
                 dominantBaseline="central"
                 fill="white"
-                fontSize={8}
-                fontWeight={600}
+                fontSize="10"
                 fontFamily="JetBrains Mono, monospace"
+                fontWeight="600"
               >
-                {node.label.length > 14
-                  ? node.label.slice(0, 12) + ".."
-                  : node.label}
+                {trunc(node.label)}
               </text>
             </g>
           );
         })}
 
         <defs>
-          <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#a855f7" />
-            <stop offset="100%" stopColor="#7c3aed" />
-          </linearGradient>
+          <radialGradient id="nodeGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#a855f7" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#1a0547" stopOpacity="0.8" />
+          </radialGradient>
         </defs>
       </svg>
     </div>
