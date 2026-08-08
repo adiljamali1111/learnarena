@@ -1,5 +1,6 @@
 import type {
   DashboardData,
+  DiagnosticQuestion,
   DuelQuestion,
 } from '../types/dashboard';
 
@@ -174,6 +175,25 @@ const DASHBOARD_SYSTEM_PROMPT = `You are an expert study assistant. Given raw co
 
 Generate 5-8 core concepts, 8-12 context nodes with edges, exactly 1 scenario with 4 options (one correct), and exactly 6-8 diagnostic questions. Ensure all IDs are unique. Make the content educational and accurate based on the notes provided.`;
 
+const DIAGNOSTIC_QUESTIONS_SYSTEM_PROMPT = `You are a diagnostic quiz generator. Given study notes, generate fresh multiple-choice questions to test understanding. Return exactly this JSON structure:
+
+{
+  "questions": [
+    {
+      "id": "string — unique id",
+      "question": "string — MCQ question",
+      "options": ["string — 4 options"],
+      "correctIndex": "number — 0-3",
+      "explanation": "string — full explanation of the correct answer",
+      "distractorsExplanation": "string — explain why wrong answers are incorrect",
+      "topic": "string — topic tag",
+      "difficulty": "easy|medium|hard"
+    }
+  ]
+}
+
+Generate exactly 6 diagnostic questions. Each must be unique and test different aspects of the notes. Do NOT repeat any questions that may have been generated previously. Make them increasingly difficult — first two easy, middle two medium, last two hard.`;
+
 const DUEL_QUESTIONS_SYSTEM_PROMPT = `You are a quiz generator. Given study notes, generate unique multiple-choice questions for a timed duel game. Return exactly this JSON structure:
 
 {
@@ -221,6 +241,18 @@ export async function generateDashboard(
     `Generate a study dashboard from these notes:\n\n${notes}`,
     imageDataUrls,
   );
+}
+
+export async function generateDiagnosticQuestions(
+  apiKey: string,
+  notes: string,
+): Promise<DiagnosticQuestion[]> {
+  const result = await apiCall<{ questions: DiagnosticQuestion[] }>(
+    apiKey,
+    DIAGNOSTIC_QUESTIONS_SYSTEM_PROMPT,
+    `Generate 6 fresh diagnostic questions from these notes:\n\n${notes}`,
+  );
+  return result.questions || [];
 }
 
 export async function generateFreshQuestions(

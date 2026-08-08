@@ -8,7 +8,7 @@ import MasteryProgressCard from '../cards/MasteryProgressCard';
 import { Plus } from 'lucide-react';
 
 export default function DashboardView() {
-  const { state, setModal, loadModule } = useDashboard();
+  const { state, setModal, loadModule, refreshDiagnosticQuestions } = useDashboard();
   const activeModule = state.modules.find((m) => m.id === state.activeModuleId);
 
   if (!activeModule && state.modules.length === 0) {
@@ -121,6 +121,7 @@ export default function DashboardView() {
           <DiagnosticQuestCard
             data={dashboard.diagnosticQuestions}
             moduleId={activeModule.id}
+            onRefresh={refreshDiagnosticQuestions}
           />
         </div>
 

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ClipboardCheck, ChevronRight, HelpCircle, Zap } from 'lucide-react';
+import { ClipboardCheck, ChevronRight, HelpCircle, Zap, RefreshCw } from 'lucide-react';
 import type { DiagnosticQuestion } from '../../types/dashboard';
 import { markQuestionSeen } from '../../services/questionBank';
 
@@ -7,14 +7,16 @@ interface Props {
   data: DiagnosticQuestion[];
   moduleId: string;
   onXpGained?: (amount: number) => void;
+  onRefresh?: () => Promise<void>;
 }
 
-export default function DiagnosticQuestCard({ data, moduleId, onXpGained }: Props) {
+export default function DiagnosticQuestCard({ data, moduleId, onXpGained, onRefresh }: Props) {
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [results, setResults] = useState<Record<string, boolean>>({});
+  const [refreshing, setRefreshing] = useState(false);
 
   const current = data[index];
   if (!current) return null;
@@ -46,6 +48,21 @@ export default function DiagnosticQuestCard({ data, moduleId, onXpGained }: Prop
     }
   };
 
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    setIndex(0);
+    setSelected(null);
+    setIsRevealed(false);
+    setShowHint(false);
+    setResults({});
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const correctCount = Object.values(results).filter(Boolean).length;
   const isLast = index === data.length - 1;
 
@@ -66,9 +83,26 @@ export default function DiagnosticQuestCard({ data, moduleId, onXpGained }: Prop
             )}
           </p>
         </div>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted capitalize">
-          {current.difficulty || 'medium'}
-        </span>
+
+        {/* Refresh + difficulty badge */}
+        <div className="flex items-center gap-2">
+          {onRefresh && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="w-7 h-7 rounded-lg bg-white/5 hover:bg-accent/20 flex items-center justify-center transition-colors disabled:opacity-40 cursor-pointer"
+              title="Generate new questions"
+            >
+              <RefreshCw
+                size={14}
+                className={`text-accent ${refreshing ? 'animate-spin' : ''}`}
+              />
+            </button>
+          )}
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted capitalize">
+            {current.difficulty || 'medium'}
+          </span>
+        </div>
       </div>
 
       <p className="text-sm font-medium text-foreground mb-4">{current.question}</p>

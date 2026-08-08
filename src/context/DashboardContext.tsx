@@ -17,7 +17,7 @@ import type {
   DocumentImage,
 } from '../types/dashboard';
 import { getComboMultiplier, getComboLevel } from '../types/dashboard';
-import { generateDashboard, generateFreshQuestions } from '../services/openrouter';
+import { generateDashboard, generateDiagnosticQuestions, generateFreshQuestions } from '../services/openrouter';
 import { parseMultipleFiles } from '../services/fileParser';
 import {
   clearSeenForModule,
@@ -75,6 +75,8 @@ interface DashboardContextValue {
   tickDuelTimer: () => void;
   closeDuelHint: () => void;
   resetDuel: () => void;
+  // Diagnostic refresh
+  refreshDiagnosticQuestions: () => Promise<void>;
   // Den actions
   openDenTool: (tool: DenToolKey) => void;
   closeDenTool: () => void;
@@ -567,6 +569,48 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [saveState]);
 
   /* ===========================
+     Diagnostic Refresh
+     =========================== */
+  const refreshDiagnosticQuestions = useCallback(async () => {
+    const apiKey = localStorage.getItem(API_KEY_KEY);
+    const activeModule = state.modules.find(
+      (m) => m.id === state.activeModuleId,
+    );
+    if (!apiKey || !activeModule || !activeModule.dashboard) return;
+
+    try {
+      const newQuestions = await generateDiagnosticQuestions(
+        apiKey,
+        activeModule.notes,
+      );
+
+      saveState((s) => ({
+        ...s,
+        modules: s.modules.map((m) =>
+          m.id === s.activeModuleId
+            ? {
+                ...m,
+                dashboard: m.dashboard
+                  ? { ...m.dashboard, diagnosticQuestions: newQuestions }
+                  : m.dashboard,
+              }
+            : m,
+        ),
+      }));
+
+      addNotification({
+        type: 'info',
+        message: 'Diagnostic questions refreshed with new AI-generated ones!',
+        read: false,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to refresh questions';
+      addNotification({ type: 'error', message, read: false });
+    }
+  }, [saveState, addNotification, state.modules, state.activeModuleId]);
+
+  /* ===========================
      Learner's Den
      =========================== */
   const openDenTool = useCallback(
@@ -603,6 +647,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     tickDuelTimer,
     closeDuelHint,
     resetDuel,
+    refreshDiagnosticQuestions,
     openDenTool,
     closeDenTool,
     setActiveModule,
