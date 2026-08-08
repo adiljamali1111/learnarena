@@ -6,13 +6,9 @@ export const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 export const TUTOR_SYSTEM_PROMPT =
   'You are a helpful tutor. Base your answers only on the provided text. Do not use external knowledge.';
 
-export type ContentPart =
-  | { type: 'text'; text: string }
-  | { type: 'image_url'; image_url: { url: string } };
-
-export interface OpenRouterMessage {
+interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string | ContentPart[];
+  content: string;
 }
 
 interface OpenRouterOptions {
