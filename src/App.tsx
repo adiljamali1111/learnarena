@@ -1,10 +1,9 @@
-import { DashboardProvider } from './context/DashboardContext';
-import AppShell from './components/AppShell';
-
 export default function App() {
   return (
-    <DashboardProvider>
-      <AppShell />
-    </DashboardProvider>
+    <div className="min-h-screen bg-dotgrid-glow flex items-center justify-center">
+      <p className="text-md text-text-muted tracking-wide select-none">
+        Your app will be here
+      </p>
+    </div>
   );
 }
