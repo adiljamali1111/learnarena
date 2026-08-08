@@ -135,7 +135,7 @@ export default function DiagnosticQuestCard({ data, moduleId, onXpGained }: Prop
       {/* Progress dots + Next */}
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-glass-border">
         <div className="flex gap-1">
-          {data.map((q, i) => (
+          {data.map((q) => (
             <div
               key={q.id}
               className={`w-2 h-2 rounded-full transition-colors ${

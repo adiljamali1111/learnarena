@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Map } from 'lucide-react';
-import type { ContextMap, ContextMapNode, ContextMapEdge } from '../../types/dashboard';
+import type { ContextMap } from '../../types/dashboard';
 
 interface Props {
   data: ContextMap;

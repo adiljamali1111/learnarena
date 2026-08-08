@@ -12,22 +12,17 @@ import type {
   TabKey,
   ModalType,
   DuelState,
-  DuelQuestion,
   Notification,
   DenToolKey,
-  DashboardData,
   DocumentImage,
 } from '../types/dashboard';
 import { getComboMultiplier, getComboLevel } from '../types/dashboard';
-import { generateDashboard, generateFreshQuestions, generateDenContent } from '../services/openrouter';
+import { generateDashboard, generateFreshQuestions } from '../services/openrouter';
 import { parseMultipleFiles } from '../services/fileParser';
 import {
-  isQuestionSeen,
-  markQuestionSeen,
-  getUnseenQuestionIds,
   clearSeenForModule,
 } from '../services/questionBank';
-import { getDocumentImages, clearDocumentImages } from '../services/documentContext';
+import { clearDocumentImages } from '../services/documentContext';
 
 /* ===========================
    Constants
@@ -525,9 +520,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setState((prev) => {
       const nextIdx = prev.duel.currentIndex + 1;
       if (nextIdx >= prev.duel.questions.length) {
-        // Determine winner
-        const playerWon = prev.duel.playerScore > prev.duel.rivalScore;
-        const isDraw = prev.duel.playerScore === prev.duel.rivalScore;
         const newHighScore = Math.max(
           prev.duel.highScore,
           prev.duel.playerScore,

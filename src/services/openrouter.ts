@@ -1,13 +1,6 @@
 import type {
   DashboardData,
-  DiagnosticQuestion,
   DuelQuestion,
-  AudioOverviewData,
-  MindMapData,
-  PresentationData,
-  RecallCardsData,
-  VisualBreakdownData,
-  StudyReportData,
 } from '../types/dashboard';
 
 const API_BASE = 'https://openrouter.ai/api/v1/chat/completions';
@@ -15,13 +8,17 @@ const MODEL = 'openai/gpt-4o-mini';
 const APP_TITLE = 'LearnArena';
 
 export class OpenRouterError extends Error {
+  statusCode: number;
+  code: string;
   constructor(
     message: string,
-    public statusCode: number,
-    public code: string,
+    statusCode: number,
+    code: string,
   ) {
     super(message);
     this.name = 'OpenRouterError';
+    this.statusCode = statusCode;
+    this.code = code;
   }
 }
 

@@ -21,19 +21,21 @@ interface ParseResult {
 async function parsePdf(file: File): Promise<ParseResult> {
   const pdfjsLib = await import('pdfjs-dist');
   const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker.default || pdfjsWorker;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = String(pdfjsWorker.default || pdfjsWorker);
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
   let text = '';
   const images: DocumentImage[] = [];
-  const maxPages = Math.min(pdf.numPages, MAX_IMAGES_PER_FILE + 1);
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageText = content.items.map((item: { str?: string }) => item.str || '').join(' ');
+    const pageText = (content.items as any[])
+      .filter((item: any) => typeof item.str === 'string')
+      .map((item: any) => item.str)
+      .join(' ');
     text += `[Page ${i}]\n${pageText}\n\n`;
 
     // Render page as image (up to max pages)
@@ -44,7 +46,7 @@ async function parsePdf(file: File): Promise<ParseResult> {
       canvas.height = viewport.height;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        await (page as any).render({ canvasContext: ctx, viewport }).promise;
         const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
         images.push({
           id: `pdf-${file.name}-${i}`,

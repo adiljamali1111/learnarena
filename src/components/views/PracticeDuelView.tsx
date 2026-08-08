@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import {
   Swords,
   Timer,
@@ -8,7 +7,6 @@ import {
   Trophy,
   Shield,
   HelpCircle,
-  X,
   RotateCcw,
   Star,
 } from 'lucide-react';
@@ -17,7 +15,6 @@ import {
   getComboLabel,
   getComboLevel,
   COMBO_COLORS,
-  type ComboLevel,
 } from '../../types/dashboard';
 
 export default function PracticeDuelView() {
@@ -26,7 +23,6 @@ export default function PracticeDuelView() {
     startDuel,
     answerDuelQuestion,
     nextDuelQuestion,
-    closeDuelHint,
     resetDuel,
   } = useDashboard();
 

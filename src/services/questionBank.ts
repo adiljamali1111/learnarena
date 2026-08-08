@@ -1,5 +1,3 @@
-import type { DocumentImage } from '../types/dashboard';
-
 interface SeenQuestion {
   id: string;
   moduleId: string;

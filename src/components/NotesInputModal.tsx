@@ -6,7 +6,7 @@ const ACCEPTED_TYPES = '.pdf,.docx,.pptx,.txt,.md';
 const MAX_FILES = 6;
 
 export default function NotesInputModal() {
-  const { setModal, generateFromNotes, state } = useDashboard();
+  const { setModal, generateFromNotes } = useDashboard();
   const [notes, setNotes] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [dragActive, setDragActive] = useState(false);
