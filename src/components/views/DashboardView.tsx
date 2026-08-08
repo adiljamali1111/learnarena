@@ -111,13 +111,13 @@ export default function DashboardView() {
           <ContextMapCard data={dashboard.contextMap} />
         </div>
 
-        {/* Scenario Sandbox — wider for text input */}
-        <div className="lg:col-span-2">
+        {/* Scenario Sandbox — narrower for quick interaction */}
+        <div className="lg:col-span-1">
           <ScenarioSandboxCard data={dashboard.scenario} />
         </div>
 
-        {/* Diagnostic Quest */}
-        <div className="lg:col-span-1">
+        {/* Diagnostic Quest — wider so it reads like a real quiz card */}
+        <div className="lg:col-span-2">
           <DiagnosticQuestCard
             data={dashboard.diagnosticQuestions}
             moduleId={activeModule.id}
