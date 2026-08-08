@@ -34,20 +34,23 @@ function Header() {
 
   return (
     <header className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between backdrop-blur-xl bg-dark-base/60 border-b border-glass-border">
-      {/* Left — brand */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-glow-purple-sm">
+      {/* Left — brand (clicking navigates to dashboard) */}
+      <button
+        onClick={() => setActiveTab('dashboard')}
+        className="flex items-center gap-3 group cursor-pointer transition-all"
+      >
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-glow-purple-sm group-hover:shadow-glow-purple transition-shadow">
           <span className="text-sm">🧠</span>
         </div>
         <div className="hidden sm:block">
-          <h1 className="font-heading font-bold text-sm text-glow-cyan">LearnArena</h1>
+          <h1 className="font-heading font-bold text-sm text-glow-cyan group-hover:text-glow transition-colors">LearnArena</h1>
           {activeModule && (
             <p className="text-[10px] text-muted-lighter truncate max-w-[160px]">
               {activeModule.title}
             </p>
           )}
         </div>
-      </div>
+      </button>
 
       {/* Center — tabs */}
       <nav className="flex gap-0.5 sm:gap-1 bg-white/5 rounded-2xl p-1" role="tablist">
