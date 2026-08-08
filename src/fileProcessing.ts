@@ -61,7 +61,7 @@ function validateFile(file: File): string | null {
 
 async function processPDF(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
-  const pdf = await getDocument(buffer).promise;
+  const pdf = await getDocument({ data: buffer }).promise;
   const pages: string[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {

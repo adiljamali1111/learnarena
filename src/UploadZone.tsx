@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, type DragEvent, type ChangeEvent } from 'react';
-import { Upload, FileText, FileImage, File as FileIcon, AlertCircle } from 'lucide-react';
+import { Upload, FileText, File as FileIcon, AlertCircle } from 'lucide-react';
 
 export interface UploadFileItem {
   id: string;
