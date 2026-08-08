@@ -177,28 +177,28 @@ export default function App() {
 function AppShell() {
   const { state } = useDashboard();
 
-  if (!state.hasEntered) {
-    return <IntroPage />;
-  }
-
   return (
-    <div className="min-h-screen bg-dark-base">
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-accent/5 blur-3xl" />
-      </div>
+    <>
+      {!state.hasEntered ? <IntroPage /> : (
+        <div className="min-h-screen bg-dark-base">
+          <div className="fixed inset-0 pointer-events-none">
+            <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl" />
+            <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-accent/5 blur-3xl" />
+          </div>
 
-      <div className="relative z-10 flex flex-col min-h-screen pb-16 sm:pb-0">
-        <Header />
-        <main className="flex-1">
-          <MainContent />
-        </main>
-        <MobileTabBar />
-      </div>
+          <div className="relative z-10 flex flex-col min-h-screen pb-16 sm:pb-0">
+            <Header />
+            <main className="flex-1">
+              <MainContent />
+            </main>
+            <MobileTabBar />
+          </div>
+        </div>
+      )}
 
-      {/* Modals */}
+      {/* Modals — rendered outside the main branch so they work on the intro page too */}
       {state.modal === 'apiKey' && <ApiKeyModal />}
       {state.modal === 'notesInput' && <NotesInputModal />}
-    </div>
+    </>
   );
 }
