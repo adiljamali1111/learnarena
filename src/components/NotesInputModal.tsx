@@ -75,112 +75,114 @@ export default function NotesInputModal() {
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+        <div className="flex items-center gap-3 mb-4 sm:mb-6">
+          <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center shrink-0">
             <FileText className="text-accent" size={20} />
           </div>
-          <div>
-            <h2 className="font-heading font-bold text-lg">New Study Module</h2>
-            <p className="text-xs text-muted">
+          <div className="min-w-0">
+            <h2 className="font-heading font-bold text-lg truncate">New Study Module</h2>
+            <p className="text-xs text-muted truncate">
               Paste your notes or upload course materials
             </p>
           </div>
         </div>
 
-        {/* Textarea */}
-        <textarea
-          ref={textareaRef}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Paste your notes here... (or upload files below)"
-          className="w-full flex-1 min-h-[160px] px-4 py-3 rounded-xl bg-white/5 border border-glass-border text-foreground placeholder-muted-lighter font-mono text-sm focus:outline-none focus:border-accent transition-colors resize-none"
-        />
-
-        {/* File drop zone */}
-        <div
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          className={`mt-4 border-2 border-dashed rounded-xl p-4 text-center transition-colors cursor-pointer ${
-            dragActive
-              ? 'drop-zone-active'
-              : 'border-glass-border hover:border-accent/40'
-          }`}
-          onClick={() => inputRef.current?.click()}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept={ACCEPTED_TYPES}
-            onChange={handleFileSelect}
-            className="hidden"
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto min-h-0 space-y-3 sm:space-y-4">
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Paste your notes here... (or upload files below)"
+            className="w-full min-h-[120px] sm:min-h-[160px] px-4 py-3 rounded-xl bg-white/5 border border-glass-border text-foreground placeholder-muted-lighter font-mono text-sm focus:outline-none focus:border-accent transition-colors resize-none"
           />
-          <Upload
-            size={24}
-            className={`mx-auto mb-2 ${dragActive ? 'text-accent' : 'text-muted-lighter'}`}
-          />
-          <p className="text-sm text-muted">
-            {dragActive
-              ? 'Drop files here'
-              : 'Drop files or click to upload'}
-          </p>
-          <p className="text-xs text-muted-lighter mt-1">
-            PDF, DOCX, PPTX, TXT, MD (max 15MB each, up to {MAX_FILES} files)
-          </p>
-        </div>
 
-        {/* File list */}
-        {files.length > 0 && (
-          <div className="mt-3 space-y-1.5 max-h-[120px] overflow-y-auto">
-            {files.map((file, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 text-sm"
-              >
-                <File size={14} className="text-accent shrink-0" />
-                <span className="text-foreground truncate flex-1">{file.name}</span>
-                <span className="text-muted-lighter text-xs shrink-0">
-                  {(file.size / 1024).toFixed(0)} KB
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(i);
-                  }}
-                  className="text-muted hover:text-destructive transition-colors cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Warning */}
-        {!hasContent && (
-          <div className="mt-3 flex items-start gap-2 text-xs text-warning">
-            <AlertCircle size={14} className="mt-0.5 shrink-0" />
-            <p>
-              Paste some notes or upload at least one file to generate your
-              dashboard.
+          {/* File drop zone */}
+          <div
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-xl p-3 sm:p-4 text-center transition-colors cursor-pointer ${
+              dragActive
+                ? 'drop-zone-active'
+                : 'border-glass-border hover:border-accent/40'
+            }`}
+            onClick={() => inputRef.current?.click()}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept={ACCEPTED_TYPES}
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Upload
+              size={20}
+              className={`mx-auto mb-1 sm:mb-2 ${dragActive ? 'text-accent' : 'text-muted-lighter'}`}
+            />
+            <p className="text-xs sm:text-sm text-muted">
+              {dragActive
+                ? 'Drop files here'
+                : 'Drop files or click to upload'}
+            </p>
+            <p className="text-[10px] sm:text-xs text-muted-lighter mt-1">
+              PDF, DOCX, PPTX, TXT, MD (max 15MB, up to {MAX_FILES} files)
             </p>
           </div>
-        )}
 
-        {/* Actions */}
-        <div className="flex gap-3 mt-6">
+          {/* File list */}
+          {files.length > 0 && (
+            <div className="space-y-1.5 max-h-[100px] overflow-y-auto">
+              {files.map((file, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 text-sm"
+                >
+                  <File size={14} className="text-accent shrink-0" />
+                  <span className="text-foreground truncate flex-1">{file.name}</span>
+                  <span className="text-muted-lighter text-xs shrink-0">
+                    {(file.size / 1024).toFixed(0)} KB
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(i);
+                    }}
+                    className="text-muted hover:text-destructive transition-colors cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Warning */}
+          {!hasContent && (
+            <div className="flex items-start gap-2 text-xs text-warning">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" />
+              <p>
+                Paste some notes or upload at least one file to generate your dashboard.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Actions — pinned to bottom */}
+        <div className="flex gap-3 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-glass-border shrink-0">
           <button
             onClick={() => setModal('none')}
-            className="btn-base flex-1 py-3 rounded-xl bg-white/5 text-muted hover:text-foreground hover:bg-white/10 transition-colors"
+            className="btn-base flex-1 py-2.5 sm:py-3 rounded-xl bg-white/5 text-muted hover:text-foreground hover:bg-white/10 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!hasContent || isSubmitting}
-            className="btn-base flex-1 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold hover:shadow-glow-purple transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn-base flex-1 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold hover:shadow-glow-purple transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <span className="flex items-center justify-center gap-2">

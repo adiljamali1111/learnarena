@@ -50,7 +50,7 @@ function Header() {
       </div>
 
       {/* Center — tabs */}
-      <nav className="flex gap-1 bg-white/5 rounded-2xl p-1" role="tablist">
+      <nav className="flex gap-0.5 sm:gap-1 bg-white/5 rounded-2xl p-1" role="tablist">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = state.activeTab === tab.key;
@@ -60,7 +60,7 @@ function Header() {
               role="tab"
               aria-selected={isActive}
               onClick={() => setActiveTab(tab.key)}
-              className={`pill-tab flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+              className={`pill-tab flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                 isActive
                   ? 'bg-primary/20 text-primary shadow-sm'
                   : 'text-muted hover:text-foreground'
@@ -103,24 +103,25 @@ function MobileTabBar() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 py-2 bg-dark-elevated/90 backdrop-blur-xl border-t border-glass-border sm:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-1 py-1.5 bg-dark-elevated/90 backdrop-blur-xl border-t border-glass-border sm:hidden"
       role="tablist"
     >
       {TABS.map((tab) => {
         const Icon = tab.icon;
         const isActive = state.activeTab === tab.key;
+        const shortLabel = tab.key === 'duel' ? 'Duel' : tab.key === 'den' ? 'Den' : tab.label;
         return (
           <button
             key={tab.key}
             role="tab"
             aria-selected={isActive}
             onClick={() => setActiveTab(tab.key)}
-            className={`pill-tab flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all ${
+            className={`pill-tab flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-xl transition-all ${
               isActive ? 'text-primary' : 'text-muted-lighter'
             }`}
           >
             <Icon size={18} />
-            <span className="text-[9px] font-medium">{tab.label}</span>
+            <span className="text-[9px] font-medium whitespace-nowrap">{shortLabel}</span>
           </button>
         );
       })}
