@@ -124,6 +124,7 @@ export interface DuelQuestion {
   correctIndex: number;
   explanation: string;
   hint: string;
+  questionType: 'mcq' | 'true-false' | 'fill-in';
 }
 
 export type DuelPhase = 'idle' | 'preparing' | 'playing' | 'done';

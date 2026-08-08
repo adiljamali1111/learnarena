@@ -2,7 +2,6 @@
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
 const MAX_FILES = 6;
-const MAX_IMAGES_TOTAL = 10;
 const MAX_IMAGES_PER_FILE = 8;
 
 export interface ParseResult {

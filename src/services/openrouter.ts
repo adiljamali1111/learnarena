@@ -5,12 +5,6 @@ import type {
   DashboardData,
   DiagnosticQuestion,
   DenToolKey,
-  AudioOverviewContent,
-  MindMapContent,
-  PresentationContent,
-  RecallCardsContent,
-  VisualBreakdownContent,
-  StudyReportContent,
 } from '../types/dashboard';
 
 const API_BASE = 'https://openrouter.ai/api/v1/chat/completions';
