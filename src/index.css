@@ -1,26 +1,90 @@
 @import "tailwindcss";
 
-/* THESE ARE PLACEHOLDER FOR EMPTY APP, FEEL FREE TO REPLACE WITH DESIRED DESIGN */
-
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --color-text-muted: oklch(0.9015 0.0154 241.79);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-bg-base: oklch(0.16 0 0);
+  --color-bg-card: oklch(0.2 0 0);
+  --color-bg-elevated: oklch(0.24 0 0);
+  --color-bg-hover: oklch(0.28 0 0);
+
+  --color-accent: oklch(0.41 0.14 250);
+  --color-accent-glow: oklch(0.41 0.14 250 / 25%);
+  --color-accent-light: oklch(0.51 0.14 250);
+
+  --color-text-primary: oklch(0.92 0 0);
+  --color-text-muted: oklch(0.6 0 0);
+  --color-text-dim: oklch(0.4 0 0);
+
+  --color-border: oklch(0.28 0 0);
+  --color-destructive: oklch(0.58 0.22 27);
+  --color-success: oklch(0.6 0.13 163);
+
+  --shadow-glow: 0 0 20px oklch(0.41 0.14 250 / 15%);
+
+  --animate-slide-in: slide-in 0.3s ease-out;
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-spin: spin 1s linear infinite;
+
+  @keyframes slide-in {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
-.bg-dotgrid-glow {
-  background-color: oklch(0.1638 0 0);
-  background-image:
-    radial-gradient(
-      circle at 50% 118%,
-      oklch(0.41 0.14 250 / 45%) 0%,
-      oklch(0.41 0.14 250 / 22%) 22%,
-      oklch(0.41 0.14 250 / 10%) 32%,
-      oklch(0.41 0.14 250 / 4%) 38%,
-      transparent 45%
-    ),
-    radial-gradient(oklch(0.41 0.14 250 / 4%) 1px, transparent 1px);
-  background-size:
-    100% 100%,
-    16px 16px;
-  background-position: center, center;
+/* Base global styles */
+body {
+  margin: 0;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.28 0 0);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.35 0 0);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
