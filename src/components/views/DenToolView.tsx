@@ -9,7 +9,7 @@ import type {
   StudyReportData,
 } from '../../types/dashboard';
 import MindMapTool from '../den/MindMapTool';
-import { Play, Pause, Square } from 'lucide-react';
+import { Play, Pause, Square, FileDown, Loader2 } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useDashboard } from '../../context/DashboardContext';
 
@@ -402,33 +402,221 @@ function VisualBreakdownTool() {
 /* ===========================
    Study Report Tool
    =========================== */
+/* ===========================
+   DOCX Download Helper
+   =========================== */
+async function downloadDocx(data: StudyReportData, moduleTitle: string) {
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, BorderStyle, WidthType } = await import('docx');
+
+  const children: (typeof Paragraph | typeof Table)[] = [];
+
+  // Title
+  children.push(
+    new Paragraph({
+      text: `Study Report: ${moduleTitle}`,
+      heading: HeadingLevel.HEADING_1,
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 400 },
+    }) as any,
+  );
+
+  // --- Section A: Objective Questions ---
+  children.push(
+    new Paragraph({
+      text: 'Section A: Multiple Choice Questions',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 200 },
+    }) as any,
+  );
+
+  data.objectiveQuestions.forEach((q, i) => {
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: `${i + 1}. `, bold: true, size: 22 }),
+          new TextRun({ text: q.question, size: 22 }),
+        ],
+        spacing: { before: 200, after: 100 },
+      }) as any,
+    );
+    q.options.forEach((opt, oi) => {
+      const isCorrect = oi === q.correctIndex;
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: `${String.fromCharCode(65 + oi)}.  `, bold: true, size: 20 }),
+            new TextRun({ text: opt, bold: isCorrect, size: 20 }),
+            ...(isCorrect ? [new TextRun({ text: '  ✓', bold: true, color: '2563EB', size: 20 })] : []),
+          ],
+          indent: { left: 400 },
+          spacing: { before: 40, after: 40 },
+        }) as any,
+      );
+    });
+    children.push(new Paragraph({ spacing: { after: 120 } }) as any);
+  });
+
+  // --- Section B: Open-Ended Questions ---
+  children.push(
+    new Paragraph({
+      text: 'Section B: Open-Ended Questions',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 400, after: 200 },
+      pageBreakBefore: true,
+    }) as any,
+  );
+
+  data.subjectiveQuestions.forEach((q, i) => {
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: `Question ${i + 1}`, bold: true, size: 24 }),
+        ],
+        spacing: { before: 300, after: 60 },
+      }) as any,
+    );
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: q.question, italics: true, size: 22 })],
+        spacing: { after: 120 },
+      }) as any,
+    );
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Model Answer:', bold: true, color: '2563EB', size: 22 }),
+        ],
+        spacing: { before: 80, after: 60 },
+      }) as any,
+    );
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: q.sampleAnswer, size: 21 })],
+        spacing: { after: 300 },
+      }) as any,
+    );
+  });
+
+  // --- Section C: Glossary ---
+  children.push(
+    new Paragraph({
+      text: 'Section C: Glossary',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 400, after: 200 },
+      pageBreakBefore: true,
+    }) as any,
+  );
+
+  const headerRow = new TableRow({
+    tableHeader: true,
+    children: [
+      new TableCell({
+        width: { size: 600, type: WidthType.DXA },
+        children: [new Paragraph({ children: [new TextRun({ text: '#', bold: true, size: 20 })] })],
+      }),
+      new TableCell({
+        width: { size: 2500, type: WidthType.DXA },
+        children: [new Paragraph({ children: [new TextRun({ text: 'Term', bold: true, size: 20 })] })],
+      }),
+      new TableCell({
+        width: { size: 7000, type: WidthType.DXA },
+        children: [new Paragraph({ children: [new TextRun({ text: 'Definition', bold: true, size: 20 })] })],
+      }),
+    ],
+  });
+
+  const dataRows = data.glossary.map((entry, i) =>
+    new TableRow({
+      children: [
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(i + 1), size: 20 })] })] }),
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: entry.term, bold: true, size: 20 })] })] }),
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: entry.definition, size: 20 })] })] }),
+      ],
+    }),
+  );
+
+  children.push(new Table({ rows: [headerRow, ...dataRows] }) as any);
+
+  const doc = new Document({
+    sections: [{ children }],
+    styles: {
+      default: {
+        document: {
+          run: { font: 'Calibri', size: 22 },
+        },
+      },
+    },
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Study-Report-${moduleTitle.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').slice(0, 60)}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function StudyReportTool() {
   const { data, isLoading, error, regenerate } = useDenTool<StudyReportData>('report');
+  const { state } = useDashboard();
   const [tab, setTab] = useState<'objective' | 'subjective' | 'glossary'>('objective');
   const [revealedAnswers, setRevealedAnswers] = useState<Set<number>>(new Set());
+  const [docxLoading, setDocxLoading] = useState(false);
+
+  const activeModule = state.modules.find((m) => m.id === state.activeModuleId);
+  const moduleTitle = activeModule?.dashboard?.moduleTitle || activeModule?.title || 'Untitled Module';
+
+  const handleDownload = useCallback(async () => {
+    if (!data) return;
+    setDocxLoading(true);
+    try {
+      await downloadDocx(data, moduleTitle);
+    } catch (err) {
+      console.error('Failed to download .docx:', err);
+    } finally {
+      setDocxLoading(false);
+    }
+  }, [data, moduleTitle]);
 
   if (!isLoading && data) {
     return (
       <DenToolShell toolKey="report" isLoading={isLoading} error={error} onRegenerate={regenerate}>
-        {/* Tabs */}
-        <div className="flex gap-2 mb-4">
-          {([
-            { key: 'objective' as const, label: 'MCQs', count: data.objectiveQuestions.length },
-            { key: 'subjective' as const, label: 'Open-Ended', count: data.subjectiveQuestions.length },
-            { key: 'glossary' as const, label: 'Glossary', count: data.glossary.length },
-          ]).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-4 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                tab === t.key
-                  ? 'bg-primary/20 text-primary'
-                  : 'bg-white/5 text-muted hover:text-foreground'
-              }`}
-            >
-              {t.label} ({t.count})
-            </button>
-          ))}
+        {/* Download button & Tabs */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex gap-2">
+            {([
+              { key: 'objective' as const, label: 'MCQs', count: data.objectiveQuestions.length },
+              { key: 'subjective' as const, label: 'Open-Ended', count: data.subjectiveQuestions.length },
+              { key: 'glossary' as const, label: 'Glossary', count: data.glossary.length },
+            ]).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-4 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                  tab === t.key
+                    ? 'bg-primary/20 text-primary'
+                    : 'bg-white/5 text-muted hover:text-foreground'
+                }`}
+              >
+                {t.label} ({t.count})
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleDownload}
+            disabled={docxLoading}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-white text-xs font-semibold hover:shadow-glow-green transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {docxLoading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <FileDown size={14} />
+            )}
+            {docxLoading ? 'Generating...' : 'Download .docx'}
+          </button>
         </div>
 
         {/* Objective Questions */}
