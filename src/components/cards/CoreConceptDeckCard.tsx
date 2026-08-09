@@ -26,9 +26,9 @@ export default function CoreConceptDeckCard({ data }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col">
-        <h4 className="text-lg font-bold text-glow-purple mb-2">{current.term}</h4>
-        <p className="text-sm text-muted leading-relaxed mb-3">{current.definition}</p>
+      <div className="flex-1 flex flex-col min-w-0">
+        <h4 className="text-lg font-bold text-glow-purple mb-2 break-words">{current.term}</h4>
+        <p className="text-sm text-muted leading-relaxed mb-3 break-words">{current.definition}</p>
 
         <div className="mt-auto">
           <div className="glass-card p-3 mb-3 bg-accent/5 border-accent/20">

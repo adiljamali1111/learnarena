@@ -15,7 +15,7 @@ export default function ModuleSynthesisCard({ data }: Props) {
         <h3 className="font-heading font-semibold text-lg">Module Synthesis</h3>
       </div>
 
-      <p className="text-sm text-muted leading-relaxed mb-4">{data.summary}</p>
+      <p className="text-sm text-muted leading-relaxed mb-4 break-words">{data.summary}</p>
 
       <div className="flex items-start gap-2.5 mb-3">
         <ListChecks size={16} className="text-accent mt-0.5 shrink-0" />

@@ -156,7 +156,7 @@ export default function ContextMapCard({ data }: Props) {
                   className="transition-all duration-200"
                 />
 
-                {/* Label */}
+                {/* Label — truncate if too long */}
                 <text
                   x={node.x}
                   y={node.y + NODE_RADIUS + 12}
@@ -170,9 +170,11 @@ export default function ContextMapCard({ data }: Props) {
                   }
                   fontSize="9"
                   fontWeight={isConnected ? 'bold' : 'normal'}
+                  textLength={48}
+                  lengthAdjust="spacing"
                   className="transition-all duration-200"
                 >
-                  {node.label}
+                  {node.label.length > 14 ? node.label.slice(0, 14) + '…' : node.label}
                 </text>
               </g>
             );

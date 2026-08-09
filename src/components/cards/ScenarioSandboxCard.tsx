@@ -32,8 +32,8 @@ export default function ScenarioSandboxCard({ data }: Props) {
       </div>
 
       {/* Scenario */}
-      <h4 className="text-sm font-semibold text-glow-cyan mb-2">{data.title}</h4>
-      <p className="text-sm text-muted leading-relaxed mb-4">{data.context}</p>
+      <h4 className="text-sm font-semibold text-glow-cyan mb-2 break-words">{data.title}</h4>
+      <p className="text-sm text-muted leading-relaxed mb-4 break-words">{data.context}</p>
 
       {/* Your answer */}
       <label className="text-xs text-muted-lighter font-medium mb-1.5 flex items-center gap-1.5">

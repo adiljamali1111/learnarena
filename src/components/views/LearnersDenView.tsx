@@ -55,10 +55,10 @@ export default function LearnersDenView() {
             <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${tool.gradient} flex items-center justify-center mb-3 text-2xl`}>
               {tool.icon}
             </div>
-            <h3 className="font-heading font-semibold text-sm mb-1 group-hover:text-accent transition-colors">
+            <h3 className="font-heading font-semibold text-sm mb-1 group-hover:text-accent transition-colors truncate">
               {tool.title}
             </h3>
-            <p className="text-xs text-muted leading-relaxed mb-3">
+            <p className="text-xs text-muted leading-relaxed mb-3 line-clamp-3">
               {tool.description}
             </p>
             <div className="flex items-center gap-1 text-[10px] text-accent opacity-0 group-hover:opacity-100 transition-opacity">

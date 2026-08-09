@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useDenTool } from './useDenTool';
 import DenToolShell from './DenToolShell';
 import type { MindMapData } from '../../types/dashboard';
-import { ChevronDown, ChevronRight, ZoomIn, ZoomOut, RotateCcw, ArrowUp, ArrowDown } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 /* ===========================
    Layout Constants — Horizontal Tree
@@ -12,6 +12,7 @@ const NODE_HEIGHT = 50;
 const VERTICAL_GAP = 20;
 const LEVEL_X: Record<0 | 1 | 2, number> = { 0: 80, 1: 320, 2: 600 };
 const NODE_WIDTH = 180;
+const SVG_PADDING = 60;
 
 const COLORS = [
   '#a855f7', // purple
@@ -22,11 +23,6 @@ const COLORS = [
   '#3b82f6', // blue
   '#ec4899', // pink
 ];
-
-const NODE_PADDING = 36; // extra padding around pill text inside SVG pill
-const SVG_PADDING = 60;
-const CANVAS_W = 900;
-const CANVAS_H = 600;
 
 /* ===========================
    Layout Engine
@@ -42,10 +38,9 @@ interface LayoutNode {
   level: 0 | 1 | 2;
   parentId?: string;
   childIds: string[];
-  childrenShown: boolean;
 }
 
-function buildLayout(data: MindMapData): { nodes: LayoutNode[] } {
+function buildLayout(data: MindMapData): { nodes: LayoutNode[]; canvasH: number } {
   const nodes: LayoutNode[] = [];
   const totalBranches = data.branches.length;
 
@@ -54,25 +49,41 @@ function buildLayout(data: MindMapData): { nodes: LayoutNode[] } {
     id: 'center',
     label: data.centralTopic,
     x: LEVEL_X[0],
-    y: CANVAS_H / 2,
+    y: 0, // will offset later
     color: '#a855f7',
     level: 0,
     childIds: data.branches.map((_, i) => `branch-${i}`),
-    childrenShown: true,
   };
   nodes.push(root);
 
   // ── Level 1: Branch nodes ──
-  let totalL2 = 0;
-  data.branches.forEach((b) => { totalL2 += b.children.length; });
+  // First pass: compute Y positions of each branch
+  const branchYPositions: number[] = [];
+  let currentY = SVG_PADDING + NODE_HEIGHT / 2;
 
-  // Distribute L1 nodes evenly in vert space
-  const l1TotalHeight = totalBranches * NODE_HEIGHT + (totalBranches - 1) * VERTICAL_GAP;
-  const l1StartY = (CANVAS_H - l1TotalHeight) / 2;
+  // Root node Y at center of all branches
+  data.branches.forEach((b, bIdx) => {
+    const children = b.children;
+    const l2Count = children.length;
+    // Height of this branch cluster (branch node + its children)
+    const clusterH = Math.max(
+      NODE_HEIGHT,
+      l2Count * NODE_HEIGHT + (l2Count - 1) * VERTICAL_GAP
+    );
+    const clusterCenterY = currentY + (l2Count > 0 ? clusterH / 2 : NODE_HEIGHT / 2);
+    branchYPositions.push(clusterCenterY);
+    currentY += clusterH + VERTICAL_GAP;
+  });
 
+  // Total height
+  const canvasH = Math.max(currentY + SVG_PADDING, 400);
+
+  // Center the root node vertically
+  root.y = canvasH / 2;
+
+  // Now place branch + children
   data.branches.forEach((branch, bIdx) => {
-    const by = l1StartY + bIdx * (NODE_HEIGHT + VERTICAL_GAP) + NODE_HEIGHT / 2;
-
+    const by = branchYPositions[bIdx];
     const branchNode: LayoutNode = {
       id: `branch-${bIdx}`,
       label: branch.label,
@@ -82,7 +93,6 @@ function buildLayout(data: MindMapData): { nodes: LayoutNode[] } {
       level: 1,
       parentId: 'center',
       childIds: branch.children.map((_, cIdx) => `child-${bIdx}-${cIdx}`),
-      childrenShown: true,
     };
     nodes.push(branchNode);
 
@@ -102,12 +112,11 @@ function buildLayout(data: MindMapData): { nodes: LayoutNode[] } {
         level: 2,
         parentId: `branch-${bIdx}`,
         childIds: [],
-        childrenShown: false,
       });
     });
   });
 
-  return { nodes };
+  return { nodes, canvasH };
 }
 
 /* ===========================
@@ -143,7 +152,7 @@ function MindMapEdge({
 }
 
 /* ===========================
-   Detail Panel (Bottom Sheet / Side Drawer)
+   Detail Panel (Bottom Sheet)
    =========================== */
 
 function DetailPanel({
@@ -162,13 +171,13 @@ function DetailPanel({
   return (
     <div className="glass-card p-5 animate-fade-in-up border-indigo-500/20" role="dialog" aria-label={`Details for ${node.label}`}>
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <span className="w-3 h-3 rounded-full" style={{ background: node.color }} />
-          <h4 className="text-sm font-semibold text-white">{node.label}</h4>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-3 h-3 rounded-full shrink-0" style={{ background: node.color }} />
+          <h4 className="text-sm font-semibold text-white truncate">{node.label}</h4>
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+          className="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer shrink-0"
           aria-label="Close details"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
@@ -183,7 +192,7 @@ function DetailPanel({
           {levelName}
         </span>
         {parentLabel && (
-          <span className="text-[10px] text-muted-lighter bg-white/5 px-2 py-0.5 rounded-full">
+          <span className="text-[10px] text-muted-lighter bg-white/5 px-2 py-0.5 rounded-full truncate max-w-[160px]">
             Under: {parentLabel}
           </span>
         )}
@@ -203,12 +212,11 @@ function DetailPanel({
 export default function MindMapTool() {
   const { data, isLoading, error, regenerate } = useDenTool<MindMapData>('mindmap');
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [animated, setAnimated] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
-  const svgRef = useRef<SVGSVGElement>(null);
+  const [scale, setScale] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Trigger entrance animation after mount
   useEffect(() => {
@@ -218,31 +226,15 @@ export default function MindMapTool() {
 
   // Reset view when data changes
   useEffect(() => {
-    setScrollY(0);
-    setCollapsed(new Set());
     setSelectedNodeId(null);
     setHoveredNodeId(null);
+    setScale(1);
   }, [data]);
 
-  const { nodes } = data ? buildLayout(data) : { nodes: [] as LayoutNode[] };
+  const layout = useMemo(() => (data ? buildLayout(data) : null), [data]);
+  const nodes = layout?.nodes ?? [];
+  const canvasH = layout?.canvasH ?? 600;
   const rootNode = nodes.find((n) => n.level === 0);
-
-  // Resolve which nodes are visible based on collapsed state
-  const visibleNodeIds = new Set<string>();
-  if (rootNode) {
-    visibleNodeIds.add(rootNode.id);
-    rootNode.childIds.forEach((cid) => {
-      visibleNodeIds.add(cid);
-      if (!collapsed.has(cid)) {
-        const child = nodes.find((n) => n.id === cid);
-        if (child) {
-          child.childIds.forEach((gcid) => visibleNodeIds.add(gcid));
-        }
-      }
-    });
-  }
-
-  const visibleNodes = nodes.filter((n) => visibleNodeIds.has(n.id));
 
   // Highlight logic
   const highlightedId = selectedNodeId || hoveredNodeId;
@@ -254,7 +246,6 @@ export default function MindMapTool() {
     if (highlightedNode.parentId) {
       connectedIds.add(highlightedNode.parentId);
     }
-    // Also include siblings of the parent
     if (highlightedNode.parentId) {
       const parent = nodes.find((n) => n.id === highlightedNode.parentId);
       if (parent) {
@@ -265,25 +256,16 @@ export default function MindMapTool() {
 
   // Edges to render
   const edges: { source: LayoutNode; target: LayoutNode; color: string }[] = [];
-  visibleNodes.forEach((node) => {
+  nodes.forEach((node) => {
     if (node.parentId) {
       const parent = nodes.find((n) => n.id === node.parentId);
-      if (parent && visibleNodeIds.has(parent.id)) {
+      if (parent) {
         edges.push({ source: parent, target: node, color: node.color });
       }
     }
   });
 
   /* ---- Interaction handlers ---- */
-
-  const handleToggle = useCallback((id: string) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedNodeId((prev) => (prev === id ? null : id));
@@ -295,30 +277,34 @@ export default function MindMapTool() {
 
   const selectedNode = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null;
 
-  const handlePanUp = useCallback(() => {
-    setScrollY((prev) => Math.min(prev + 60, 200));
-  }, []);
-
-  const handlePanDown = useCallback(() => {
-    setScrollY((prev) => Math.max(prev - 60, -200));
+  const zoomIn = useCallback(() => setScale((s) => Math.min(s + 0.15, 2)), []);
+  const zoomOut = useCallback(() => setScale((s) => Math.max(s - 0.15, 0.5)), []);
+  const resetView = useCallback(() => {
+    setScale(1);
+    if (containerRef.current) {
+      containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }, []);
 
   /* ---- Render ---- */
 
   // Sort nodes so edges are drawn behind nodes
-  const sortedNodes = [...visibleNodes].sort((a, b) => b.level - a.level);
+  const sortedNodes = [...nodes].sort((a, b) => b.level - a.level);
 
   return (
     <DenToolShell toolKey="mindmap" isLoading={isLoading} error={error} onRegenerate={regenerate}>
       {data && (
         <div className="flex flex-col gap-3">
-          {/* SVG Canvas */}
-          <div className="glass-card p-0 overflow-hidden relative rounded-xl" style={{ minHeight: 520 }}>
+          {/* SVG Canvas with scrollbar */}
+          <div
+            ref={containerRef}
+            className="glass-card p-0 overflow-y-auto overflow-x-hidden rounded-xl"
+            style={{ maxHeight: 520 }}
+          >
             <svg
-              ref={svgRef}
-              viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-              className="w-full h-auto"
-              style={{ minHeight: 500 }}
+              viewBox={`0 0 800 ${canvasH}`}
+              className="w-full"
+              style={{ minWidth: 700, transform: `scale(${scale})`, transformOrigin: 'top center' }}
             >
               <defs>
                 <filter id="glow-mindmap">
@@ -330,16 +316,16 @@ export default function MindMapTool() {
                 </filter>
               </defs>
 
-              <g transform={`translate(0, ${scrollY})`}>
+              <g>
                 {/* Subtle grid */}
-                <rect width={CANVAS_W} height={CANVAS_H} fill="transparent" />
+                <rect width={800} height={canvasH} fill="transparent" />
 
                 {/* Edges */}
                 {edges.map((edge, i) => {
-                  const isHighlighted =
+                  const isHL =
                     highlightedId &&
                     (edge.source.id === highlightedId || edge.target.id === highlightedId);
-                  const isConnected =
+                  const isConn =
                     connectedIds.has(edge.source.id) && connectedIds.has(edge.target.id);
                   return (
                     <MindMapEdge
@@ -349,8 +335,8 @@ export default function MindMapTool() {
                       tx={edge.target.x}
                       ty={edge.target.y}
                       color={edge.color}
-                      isHighlighted={!!isHighlighted}
-                      isConnected={isConnected}
+                      isHighlighted={!!isHL}
+                      isConnected={isConn}
                       dashArray={edge.target.level === 2 ? '5,3' : undefined}
                     />
                   );
@@ -360,54 +346,43 @@ export default function MindMapTool() {
                 {sortedNodes.map((node) => {
                   const isCenter = node.level === 0;
                   const isBranch = node.level === 1;
-                  const isCollapsed = collapsed.has(node.id);
-                  const isExpanded = !isCollapsed;
                   const hasChildren = node.childIds.length > 0;
-                  const isHighlighted = node.id === highlightedId;
-                  const isConnected = connectedIds.has(node.id);
-                  const isSelected = selectedNodeId === node.id;
+                  const isHL = node.id === highlightedId;
+                  const isConn = connectedIds.has(node.id);
+                  const isSel = selectedNodeId === node.id;
 
-                  const pillW = NODE_WIDTH;
+                  const pillW = isCenter ? 200 : NODE_WIDTH;
                   const pillH = NODE_HEIGHT;
                   const rx = 14;
-                  const alpha = isHighlighted ? 1 : isConnected ? 0.85 : isCollapsed || !hasChildren ? 0.6 : 0.75;
-                  const isCollapsible = hasChildren && isBranch;
+                  const alpha = isHL ? 1 : isConn ? 0.85 : 0.6;
+
+                  // Available width for text inside the pill
+                  const textMaxW = pillW - 24; // 12px padding on each side
 
                   return (
                     <g
                       key={node.id}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (hasChildren && !isCenter) {
-                          handleToggle(node.id);
-                        } else {
-                          handleSelect(node.id);
-                        }
+                        handleSelect(node.id);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          if (hasChildren && !isCenter) {
-                            handleToggle(node.id);
-                          } else {
-                            handleSelect(node.id);
-                          }
+                          handleSelect(node.id);
                         }
                       }}
                       role="button"
                       tabIndex={0}
-                      aria-label={`${isCenter ? 'Root' : isBranch ? 'Category' : 'Topic'}: ${node.label}${isCollapsed ? ', collapsed' : ''}`}
-                      aria-expanded={hasChildren ? !isCollapsed : undefined}
+                      aria-label={`${isCenter ? 'Root' : isBranch ? 'Category' : 'Topic'}: ${node.label}`}
                       onMouseEnter={() => handleHover(node.id)}
                       onMouseLeave={() => handleHover(null)}
                       className="cursor-pointer"
-                      style={{ transitionDelay: animated ? '50ms' : '0ms' }}
                     >
-                      {/* Center node = larger rounded rect */}
+                      {/* Center node — larger rounded rect */}
                       {isCenter ? (
                         <>
-                          {/* Outer glow ring when selected */}
-                          {isSelected && (
+                          {isSel && (
                             <rect
                               x={node.x - pillW / 2 - 5}
                               y={node.y - pillH / 2 - 5}
@@ -439,9 +414,11 @@ export default function MindMapTool() {
                             fill="white"
                             fontSize="14"
                             fontWeight="bold"
+                            textLength={textMaxW}
+                            lengthAdjust="spacing"
                             className="pointer-events-none select-none"
                           >
-                            {node.label.length > 24 ? node.label.slice(0, 24) + '…' : node.label}
+                            {node.label.length > 28 ? node.label.slice(0, 28) + '…' : node.label}
                           </text>
                         </>
                       ) : (
@@ -453,16 +430,16 @@ export default function MindMapTool() {
                             width={pillW}
                             height={pillH}
                             rx={rx}
-                            fill={isSelected ? '#1e1b4b' : '#1e1b4b'}
-                            fillOpacity={isSelected ? 0.9 : 0.7}
+                            fill={isSel ? '#1e1b4b' : '#1e1b4b'}
+                            fillOpacity={isSel ? 0.9 : 0.7}
                             stroke={
-                              isSelected
+                              isSel
                                 ? node.color
-                                : isHighlighted
+                                : isHL
                                   ? node.color
-                                  : 'rgba(99, 102, 241, 0.25)' // indigo-500/30
+                                  : 'rgba(99, 102, 241, 0.25)'
                             }
-                            strokeWidth={isSelected ? 2 : isHighlighted ? 1.5 : 1}
+                            strokeWidth={isSel ? 2 : isHL ? 1.5 : 1}
                             className="transition-all duration-200"
                             style={{
                               backdropFilter: 'blur(12px)',
@@ -470,33 +447,23 @@ export default function MindMapTool() {
                             }}
                           />
 
-                          {/* Label */}
+                          {/* Label — center-aligned inside pill */}
                           <text
-                            x={isCollapsible ? node.x - 8 : node.x}
+                            x={node.x}
                             y={node.y + 4}
-                            textAnchor={isCollapsible ? 'end' : 'middle'}
+                            textAnchor="middle"
                             fill="white"
                             fontSize={isBranch ? 12 : 11}
-                            fontWeight={isHighlighted || isSelected ? 'bold' : 'normal'}
+                            fontWeight={isHL || isSel ? 'bold' : 'normal'}
+                            textLength={textMaxW}
+                            lengthAdjust="spacing"
                             className="pointer-events-none select-none transition-all duration-200"
                           >
-                            {node.label.length > 20 ? node.label.slice(0, 20) + '…' : node.label}
+                            {node.label.length > 22 ? node.label.slice(0, 22) + '…' : node.label}
                           </text>
 
-                          {/* Expand/collapse arrow for collapsible nodes */}
-                          {hasChildren && isBranch && (
-                            <g transform={`translate(${node.x + pillW / 2 - 16}, ${node.y})`}>
-                              <circle cx={0} cy={0} r={10} fill="rgba(99,102,241,0.15)" stroke="rgba(99,102,241,0.3)" strokeWidth={0.5} />
-                              {isCollapsed ? (
-                                <ChevronRight size={12} className="text-indigo-300" style={{ transform: 'translate(-6px, -6px)' }} />
-                              ) : (
-                                <ChevronDown size={12} className="text-indigo-300" style={{ transform: 'translate(-6px, -6px)' }} />
-                              )}
-                            </g>
-                          )}
-
-                          {/* Child count badge when collapsed */}
-                          {isCollapsed && node.childIds.length > 0 && (
+                          {/* Child count badge */}
+                          {hasChildren && (
                             <g transform={`translate(${node.x + pillW / 2 - 16}, ${node.y - pillH / 2 - 10})`}>
                               <rect x={-14} y={-8} width={28} height={16} rx={8} fill={node.color} opacity={0.9} />
                               <text x={0} y={4} textAnchor="middle" fill="white" fontSize="9" fontWeight="bold" className="pointer-events-none select-none">
@@ -511,36 +478,42 @@ export default function MindMapTool() {
                 })}
               </g>
             </svg>
+          </div>
 
-            {/* Canvas Controls — Top Left Pill */}
-            <div className="absolute top-3 left-3 flex flex-col gap-1 bg-[#0f0a2e]/90 backdrop-blur-md border border-indigo-500/20 rounded-xl p-1.5 shadow-lg">
-              <button onClick={handlePanUp} className="p-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer" aria-label="Pan up" title="Pan up">
-                <ArrowUp size={14} className="text-indigo-300" />
+          {/* Controls bar — below the canvas */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-[#0f0a2e]/90 backdrop-blur-md border border-indigo-500/20 rounded-xl p-1 shadow-lg">
+              <button onClick={zoomOut} className="p-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer" aria-label="Zoom out" title="Zoom out">
+                <ZoomOut size={14} className="text-indigo-300" />
               </button>
-              <button onClick={handlePanDown} className="p-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer" aria-label="Pan down" title="Pan down">
-                <ArrowDown size={14} className="text-indigo-300" />
+              <span className="text-[10px] text-indigo-400 w-8 text-center font-mono">{Math.round(scale * 100)}%</span>
+              <button onClick={zoomIn} className="p-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer" aria-label="Zoom in" title="Zoom in">
+                <ZoomIn size={14} className="text-indigo-300" />
               </button>
-              <div className="w-full h-px bg-indigo-500/20 my-0.5" />
-              <button onClick={() => setScrollY(0)} className="p-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer" aria-label="Reset view" title="Reset view">
+              <div className="w-px h-4 bg-indigo-500/20 mx-1" />
+              <button onClick={resetView} className="p-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer" aria-label="Reset view" title="Reset view">
                 <RotateCcw size={14} className="text-indigo-300" />
               </button>
             </div>
-
-            {/* Detail panel overlaid at bottom */}
-            {selectedNode && selectedNode.id !== 'center' && (
-              <div className="absolute bottom-3 left-3 right-3 md:left-auto md:right-3 md:w-72">
-                <DetailPanel
-                  node={selectedNode}
-                  parentLabel={
-                    selectedNode.parentId
-                      ? nodes.find((n) => n.id === selectedNode.parentId)?.label
-                      : undefined
-                  }
-                  onClose={() => setSelectedNodeId(null)}
-                />
-              </div>
-            )}
+            <span className="text-[10px] text-muted-lighter ml-auto">
+              {nodes.length} nodes • Scroll vertically to explore
+            </span>
           </div>
+
+          {/* Detail panel */}
+          {selectedNode && selectedNode.id !== 'center' && (
+            <div className="md:w-72">
+              <DetailPanel
+                node={selectedNode}
+                parentLabel={
+                  selectedNode.parentId
+                    ? nodes.find((n) => n.id === selectedNode.parentId)?.label
+                    : undefined
+                }
+                onClose={() => setSelectedNodeId(null)}
+              />
+            </div>
+          )}
         </div>
       )}
     </DenToolShell>
