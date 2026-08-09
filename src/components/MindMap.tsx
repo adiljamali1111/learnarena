@@ -46,6 +46,7 @@ export default function MindMap() {
         return;
       }
 
+      // Find root (node with most connections)
       const rootNode = nodes.reduce((prev, curr) =>
         (curr.connections?.length || 0) > (prev.connections?.length || 0) ? curr : prev
       , nodes[0]);
@@ -53,15 +54,20 @@ export default function MindMap() {
       const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9\s-]/g, '').trim().slice(0, 22);
       const rootLabel = sanitize(moduleTitle) || 'Root';
 
+      // Build a graph LR tree with deterministic node IDs
       let def = 'graph LR\n';
+
+      // Root node definition
       def += `  root["🏠 ${rootLabel}"]\n`;
       def += `  style root fill:#7c3aed,stroke:#7c3aed,color:#e2e8f0,font-weight:bold,rx:8\n`;
 
+      // Primary categories (top 5 nodes by connection count)
       const primaryNodes = nodes
         .filter(n => n.id !== rootNode.id)
         .sort((a, b) => (b.connections?.length || 0) - (a.connections?.length || 0))
         .slice(0, 5);
 
+      // Assign deterministic node IDs
       const nodeIdMap = new Map<string, string>();
       nodeIdMap.set(rootNode.id, 'root');
 
@@ -86,6 +92,7 @@ export default function MindMap() {
         def += `  style ${pId} fill:#1e293b,stroke:${color},color:#e2e8f0,rx:6\n`;
         def += `  root --> ${pId}\n`;
 
+        // Sub-topics
         const subs = (primary.connections || [])
           .map(id => nodes.find(n => n.id === id))
           .filter((n): n is typeof nodes[0] => !!n && n.id !== rootNode.id && n.id !== primary.id);
@@ -143,6 +150,7 @@ export default function MindMap() {
         <h2 className="font-heading text-xl text-text-primary">Mind Map</h2>
       </div>
 
+      {/* Mermaid container */}
       <div
         ref={mermaidRef}
         className="w-full overflow-auto rounded-xl bg-slate-900/50 p-4 min-h-[300px] flex items-center justify-center"

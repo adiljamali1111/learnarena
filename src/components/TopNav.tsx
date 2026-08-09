@@ -1,45 +1,62 @@
-/* ──────────────────────────────────────────
-   LearnArena — Top Navigation Bar
-   ────────────────────────────────────────── */
-
-import { LayoutDashboard, Swords, Library, Compass } from 'lucide-react';
 import { TabKey } from '../types';
 
-interface Props {
+interface TopNavProps {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
 }
 
-const NAV_ITEMS = [
-  { id: TabKey.Dashboard, label: 'Dashboard', icon: LayoutDashboard },
-  { id: TabKey.MyUniverse, label: 'My Universe', icon: Compass },
-  { id: TabKey.PracticeDuel, label: 'Practice Duel', icon: Swords },
-  { id: TabKey.LearnersDen, label: "Learner's Den", icon: Library },
+const tabs: Array<{ key: TabKey; label: string }> = [
+  { key: TabKey.Dashboard, label: 'Dashboard' },
+  { key: TabKey.MyUniverse, label: 'My Universe' },
+  { key: TabKey.PracticeDuel, label: 'Practice Duel' },
+  { key: TabKey.LearnersDen, label: "Learner's Den" },
 ];
 
-export default function TopNav({ activeTab, onTabChange }: Props) {
+export default function TopNav({ activeTab, onTabChange }: TopNavProps) {
   return (
-    <nav className="px-4 md:px-6 py-2 border-b border-border-glass/50">
-      <div className="flex gap-1 overflow-x-auto scrollbar-none">
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
+    <>
+      {/* Desktop top nav */}
+      <nav className="hide-mobile flex items-center justify-center gap-2 p-4 pb-3">
+        <div className="dark-glass rounded-xl p-1.5 inline-flex" role="tablist" aria-label="Main navigation">
+          {tabs.map((tab) => (
             <button
-              key={item.id}
-              onClick={() => onTabChange(item.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-heading tracking-wider transition-all duration-200 shrink-0
-                ${isActive
-                  ? 'bg-primary/15 text-primary border border-primary/30'
-                  : 'text-text-muted hover:text-text-primary hover:bg-bg-elevated border border-transparent'
+              key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              onClick={() => onTabChange(tab.key)}
+              className={`px-5 py-2.5 rounded-lg text-sm font-heading tracking-wider transition-all duration-200
+                ${activeTab === tab.key
+                  ? 'bg-primary text-text-inverse shadow-lg shadow-primary/30'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-card-hover'
                 }`}
             >
-              <Icon size={16} />
-              <span className="hidden xs:inline">{item.label}</span>
+              {tab.label}
             </button>
-          );
-        })}
-      </div>
-    </nav>
+          ))}
+        </div>
+      </nav>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="show-mobile fixed bottom-0 left-0 right-0 z-40 bg-bg-card/95 backdrop-blur-xl border-t border-border-glass" role="tablist" aria-label="Main navigation">
+        <div className="flex items-center justify-around px-2 py-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              onClick={() => onTabChange(tab.key)}
+              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-[10px] font-heading tracking-wider transition-all duration-200
+                ${activeTab === tab.key
+                  ? 'text-primary'
+                  : 'text-text-muted hover:text-text-secondary'
+                }`}
+            >
+              <div className={`w-1.5 h-1.5 rounded-full mb-0.5 transition-all ${activeTab === tab.key ? 'bg-primary' : 'bg-transparent'}`} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+    </>
   );
 }

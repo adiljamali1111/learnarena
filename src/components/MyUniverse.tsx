@@ -32,6 +32,7 @@ export default function MyUniverse({ onLoad }: Props) {
     }
   };
 
+  // Cumulative XP data
   const cumulativeLevel = getCumulativeLevel(state.cumulativeXp);
   const cumProgressPercent = cumulativeLevel.totalForNextLevel > 0
     ? Math.min((cumulativeLevel.current / cumulativeLevel.totalForNextLevel) * 100, 100)
@@ -58,6 +59,7 @@ export default function MyUniverse({ onLoad }: Props) {
 
   return (
     <div className="animate-fade-in">
+      {/* Mastery XP Box */}
       <div className="dark-glass rounded-xl p-5 mb-8">
         <div className="flex items-center gap-3 mb-4">
           <Trophy size={20} className="text-warning" />
@@ -65,6 +67,7 @@ export default function MyUniverse({ onLoad }: Props) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {/* Cumulative Level */}
           <div className="bg-bg-elevated rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <Trophy size={16} className="text-warning" />
@@ -83,6 +86,7 @@ export default function MyUniverse({ onLoad }: Props) {
             </div>
           </div>
 
+          {/* Total XP */}
           <div className="bg-bg-elevated rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <Zap size={16} className="text-primary" />
@@ -92,6 +96,7 @@ export default function MyUniverse({ onLoad }: Props) {
             <p className="text-text-muted text-xs mt-1">Across all topics</p>
           </div>
 
+          {/* Next Level Goal */}
           <div className="bg-bg-elevated rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={16} className="text-accent" />
@@ -102,6 +107,7 @@ export default function MyUniverse({ onLoad }: Props) {
           </div>
         </div>
 
+        {/* Level indicator */}
         <div className="flex items-center justify-center gap-1">
           {Array.from({ length: Math.min(cumulativeLevel.level, 10) }, (_, i) => (
             <div
@@ -115,6 +121,7 @@ export default function MyUniverse({ onLoad }: Props) {
         </div>
       </div>
 
+      {/* Search */}
       <div className="relative mb-6 max-w-md">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
@@ -125,6 +132,7 @@ export default function MyUniverse({ onLoad }: Props) {
         />
       </div>
 
+      {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredModules.map((mod) => {
           const topicProgress = Math.min((mod.xp / TOPIC_MAX_XP) * 100, 100);
@@ -151,6 +159,7 @@ export default function MyUniverse({ onLoad }: Props) {
                 {mod.difficulty.toUpperCase()}
               </span>
 
+              {/* Topic XP Bar */}
               <div className="mb-3">
                 <div className="flex justify-between text-[10px] text-text-muted mb-1">
                   <span className="flex items-center gap-1"><Target size={10} /> Topic XP</span>
@@ -164,6 +173,7 @@ export default function MyUniverse({ onLoad }: Props) {
                 </div>
               </div>
 
+              {/* Progress ring */}
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative w-10 h-10">
                   <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
@@ -187,6 +197,7 @@ export default function MyUniverse({ onLoad }: Props) {
                 </div>
               </div>
 
+              {/* Mastery badge */}
               {mod.xp >= TOPIC_MAX_XP && (
                 <div className="mb-2 text-center">
                   <span className="inline-flex items-center gap-1 text-[10px] text-success font-bold bg-success/10 px-2 py-0.5 rounded-full">

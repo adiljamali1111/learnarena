@@ -67,6 +67,7 @@ export default function AppShell() {
   const hasDashboard = !!state.dashboard;
   const showIntro = !hasDashboard && !state.isGenerating;
 
+  // Close notifications on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
@@ -79,12 +80,14 @@ export default function AppShell() {
     }
   }, [showNotifications]);
 
+  // ─── API Key ───
   const handleApiKeySubmit = (key: string, provider: APIProvider) => {
     dispatch({ type: 'SET_API_PROVIDER', payload: provider });
     dispatch({ type: 'SET_API_KEY', payload: key });
     setShowApiKey(false);
     setApiError('');
 
+    // If user already has a dashboard, re-generate with the new API using existing content
     if (hasDashboard && state.activeNote) {
       handleGenerate(state.activeNote, [], state.activeNote, key, provider);
     } else {
@@ -92,6 +95,7 @@ export default function AppShell() {
     }
   };
 
+  // ─── Generate ───
   const handleGenerate = async (text: string, images: string[], noteContent: string, apiKeyOverride?: string, apiProviderOverride?: APIProvider) => {
     const effectiveKey = apiKeyOverride ?? state.apiKey;
     const effectiveProvider = apiProviderOverride ?? state.apiProvider;
@@ -108,6 +112,7 @@ export default function AppShell() {
       const data = await generateDashboard(effectiveProvider, effectiveKey, text, images);
       dispatch({ type: 'SET_DASHBOARD', payload: data });
 
+      // Create module summary with initial XP
       dispatch({
         type: 'ADD_MODULE',
         payload: {
@@ -122,6 +127,7 @@ export default function AppShell() {
         },
       });
 
+      // Create recall cards from core concepts
       dispatch({
         type: 'SET_RECALL_CARDS',
         payload: data.coreConcepts.map((cc) => ({
@@ -134,6 +140,7 @@ export default function AppShell() {
         })),
       });
 
+      // Track all quiz question texts
       for (const q of data.quiz) {
         dispatch({ type: 'ADD_SEEN_QUESTION', payload: q.question });
       }
@@ -147,6 +154,7 @@ export default function AppShell() {
       const msg = err?.message || 'Something went wrong';
       notify(msg, 'error');
 
+      // Reopen the notes modal with the visible error message
       setGenerateError(msg);
       setShowNotes(true);
 
@@ -157,6 +165,7 @@ export default function AppShell() {
     }
   };
 
+  // ─── Demo Mode ───
   const handleTryDemo = () => {
     dispatch({ type: 'SET_GENERATING', payload: true });
 
@@ -202,6 +211,7 @@ export default function AppShell() {
     }, 800);
   };
 
+  // ─── Start Flow ───
   const handleStart = () => {
     if (hasApiKey) {
       setShowNotes(true);
@@ -210,14 +220,17 @@ export default function AppShell() {
     }
   };
 
+  // ─── Tab ───
   const handleTabChange = (tab: TabKey) => {
     dispatch({ type: 'SET_ACTIVE_TAB', payload: tab });
   };
 
+  // ─── Navigate to Dashboard ───
   const handleLogoClick = () => {
     dispatch({ type: 'SET_ACTIVE_TAB', payload: TabKey.Dashboard });
   };
 
+  // ─── Render ───
   if (showIntro) {
     return (
       <>
@@ -235,6 +248,7 @@ export default function AppShell() {
     );
   }
 
+  // Generating state
   if (state.isGenerating) {
     return <LoadingSkeleton />;
   }
@@ -243,7 +257,9 @@ export default function AppShell() {
 
   return (
     <div className="min-h-screen bg-nebula">
+      {/* Header bar */}
       <header className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-border-glass/50">
+        {/* Left: Logo always visible */}
         <button onClick={handleLogoClick} className="flex items-center gap-3 shrink-0 hover:opacity-80 transition-opacity">
           <GraduationCap size={28} className="text-primary" />
           <h1 className="font-heading text-lg tracking-wider text-text-primary hidden sm:block">
@@ -251,6 +267,7 @@ export default function AppShell() {
           </h1>
         </button>
 
+        {/* Center: Module title (when available) */}
         {state.dashboard && (
           <div className="flex items-center gap-2 mx-2 truncate">
             <span className="text-lg">{state.dashboard?.moduleEmoji}</span>
@@ -268,7 +285,9 @@ export default function AppShell() {
           </div>
         )}
 
+        {/* Right: Controls */}
         <div className="flex items-center gap-2 md:gap-3">
+          {/* XP display */}
           <div className="dark-glass rounded-lg px-2 md:px-3 py-1.5 flex items-center gap-2 text-sm">
             <Zap size={16} className="text-warning shrink-0" />
             <span className="text-text-primary font-bold text-xs md:text-sm">Lv.{state.xp.level}</span>
@@ -280,6 +299,7 @@ export default function AppShell() {
             </div>
           </div>
 
+          {/* New notes button */}
           <button
             onClick={handleStart}
             className="glass-button px-3 md:px-4 py-2 text-sm flex items-center gap-2"
@@ -288,6 +308,7 @@ export default function AppShell() {
             <span className="hidden sm:inline font-heading text-xs tracking-wider">NEW</span>
           </button>
 
+          {/* Settings gear */}
           <button
             onClick={() => setShowApiKey(true)}
             className="glass-button-ghost p-2 rounded-lg"
@@ -297,6 +318,7 @@ export default function AppShell() {
             <Settings size={18} />
           </button>
 
+          {/* Notification Bell */}
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
@@ -311,6 +333,7 @@ export default function AppShell() {
               )}
             </button>
 
+            {/* Notification dropdown */}
             {showNotifications && (
               <div className="absolute right-0 top-full mt-2 w-80 md:w-96 z-50 animate-slide-up">
                 <div className="dark-glass rounded-xl p-4 max-h-[400px] overflow-y-auto shadow-2xl">
@@ -359,8 +382,10 @@ export default function AppShell() {
         </div>
       </header>
 
+      {/* Top nav */}
       <TopNav activeTab={state.activeTab} onTabChange={handleTabChange} />
 
+      {/* Main content */}
       <main className="px-4 md:px-6 pb-24 md:pb-6">
         <React.Suspense fallback={<LoadingSkeleton />}>
           {state.activeTab === TabKey.Dashboard && state.dashboard && (
@@ -419,6 +444,7 @@ export default function AppShell() {
         </React.Suspense>
       </main>
 
+      {/* Modals */}
       <ApiKeyModal isOpen={showApiKey} onSubmit={handleApiKeySubmit} error={apiError} currentProvider={state.apiProvider} />
       <NotesInputModal
         isOpen={showNotes}

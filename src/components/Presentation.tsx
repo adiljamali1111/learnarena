@@ -1,119 +1,55 @@
-/* ──────────────────────────────────────────
-   LearnArena — Presentation (Slide View)
-   ────────────────────────────────────────── */
-
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Presentation as PresentationIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 
-export default function Presentation() {
+export default function Presentation({ onClose: _onClose }: { onClose?: () => void }) {
   const { state } = useDashboard();
-  const dashboard = state.dashboard;
+  const d = state.dashboard;
   const [slide, setSlide] = useState(0);
 
-  if (!dashboard) {
-    return (
-      <div className="dark-glass rounded-xl p-8 text-center">
-        <div className="text-5xl mb-4">📽️</div>
-        <h3 className="font-heading text-lg text-text-primary mb-2">No Presentation Available</h3>
-        <p className="text-text-muted text-sm max-w-md mx-auto">
-          Generate a study module to view it as a slide-based presentation.
-        </p>
-      </div>
-    );
-  }
+  if (!d) return null;
 
-  const slides = buildSlides(dashboard);
-  const total = slides.length;
-  const current = slides[slide];
+  const slides = [
+    { title: 'Module Overview', content: `# ${d.moduleEmoji} ${d.moduleTitle}\n\n${d.synthesis.summary.split('. ').slice(0, 3).join('. ')}.`, type: 'intro' },
+    { title: 'Core Concepts', content: d.coreConcepts.map((c) => `• ${c.emoji} **${c.term}**: ${c.definition}`).join('\n\n'), type: 'concepts' },
+    { title: 'Key Relationships', content: d.contextGraph.map((n) => `• **${n.label}** — ${n.description}`).join('\n\n'), type: 'context' },
+    { title: 'Practice Scenarios', content: d.scenarios.map((s) => `## ${s.title}\n${s.description}`).join('\n\n'), type: 'scenarios' },
+    { title: 'Quiz Review', content: `Test yourself with ${d.quiz.length} questions covering all topics.`, type: 'quiz' },
+  ];
+
+  const currentSlide = slides[slide];
 
   return (
-    <div className="max-w-3xl mx-auto animate-fade-in">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="font-heading text-xl text-text-primary">Presentation</h2>
-        <span className="text-text-muted text-sm">{slide + 1} / {total}</span>
+    <div className="dark-glass rounded-xl p-6 max-w-3xl mx-auto">
+      <div className="flex items-center gap-3 mb-6">
+        <PresentationIcon size={24} className="text-accent" />
+        <h2 className="font-heading text-xl text-text-primary">Presentation Mode</h2>
       </div>
 
-      {/* Slide */}
-      <div className="dark-glass rounded-xl p-8 md:p-12 min-h-[400px] flex flex-col justify-center transition-all duration-300">
-        <div className="text-center mb-6">
-          <span className="text-5xl">{current.emoji}</span>
-        </div>
-        <h3 className="font-heading text-xl md:text-2xl text-text-primary text-center mb-4 tracking-wider">
-          {current.title}
-        </h3>
-        <div className="text-text-secondary text-sm md:text-base leading-relaxed text-center max-w-lg mx-auto">
-          {current.content}
-        </div>
-        {current.bullets && current.bullets.length > 0 && (
-          <ul className="mt-6 space-y-2 max-w-md mx-auto">
-            {current.bullets.map((b, i) => (
-              <li key={i} className="flex items-start gap-2 text-text-secondary text-sm">
-                <span className="text-primary shrink-0 mt-0.5">▸</span>
-                {b}
-              </li>
-            ))}
-          </ul>
-        )}
+      {/* Slide counter */}
+      <div className="text-center text-text-muted text-xs mb-4 font-heading">
+        {slide + 1} / {slides.length}
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center justify-between mt-6">
-        <button
-          onClick={() => setSlide((p) => Math.max(0, p - 1))}
-          disabled={slide === 0}
-          className="glass-button-ghost p-3 rounded-lg disabled:opacity-30"
-        >
-          <ChevronLeft size={22} />
+      {/* Slide content */}
+      <div className="min-h-[300px] bg-bg-elevated rounded-xl p-8 mb-6 animate-fade-in">
+        <h3 className="font-heading text-lg text-primary mb-4">{currentSlide.title}</h3>
+        <div className="text-text-secondary text-sm leading-relaxed whitespace-pre-line">
+          {currentSlide.content}
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <button onClick={() => setSlide((s) => Math.max(0, s - 1))} disabled={slide === 0}
+          className="glass-button-ghost px-4 py-2 rounded-lg flex items-center gap-2 text-sm disabled:opacity-30">
+          <ChevronLeft size={18} /> Previous
         </button>
-        <div className="flex gap-1.5">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setSlide(i)}
-              className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                i === slide ? 'bg-primary scale-125' : 'bg-text-muted/30 hover:bg-text-muted/50'
-              }`}
-            />
-          ))}
-        </div>
-        <button
-          onClick={() => setSlide((p) => Math.min(total - 1, p + 1))}
-          disabled={slide === total - 1}
-          className="glass-button-ghost p-3 rounded-lg disabled:opacity-30"
-        >
-          <ChevronRight size={22} />
+        <button onClick={() => setSlide((s) => Math.min(slides.length - 1, s + 1))} disabled={slide === slides.length - 1}
+          className="glass-button px-4 py-2 rounded-lg flex items-center gap-2 text-sm disabled:opacity-40">
+          Next <ChevronRight size={18} />
         </button>
       </div>
     </div>
   );
-}
-
-interface Slide {
-  emoji: string;
-  title: string;
-  content: string;
-  bullets?: string[];
-}
-
-function buildSlides(dashboard: NonNullable<ReturnType<typeof useDashboard>['state']['dashboard']>): Slide[] {
-  return [
-    {
-      emoji: dashboard.moduleEmoji,
-      title: dashboard.moduleTitle,
-      content: dashboard.synthesis.summary,
-      bullets: dashboard.synthesis.keyTakeaways,
-    },
-    ...dashboard.coreConcepts.map((cc) => ({
-      emoji: cc.emoji,
-      title: cc.term,
-      content: cc.definition,
-    })),
-    {
-      emoji: '🚀',
-      title: 'Next Steps',
-      content: 'Continue your learning journey with these recommended topics:',
-      bullets: dashboard.synthesis.recommendedNext,
-    },
-  ];
 }

@@ -1,255 +1,227 @@
-import type { DocumentImage } from '../types/dashboard';
-import { addDocumentImage, clearDocumentImages } from './documentContext';
+import { FILE_LIMITS, ALLOWED_FILE_TYPES } from '../constants';
 
-/* ===========================
-   Constants
-   =========================== */
-const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
-const MAX_FILES = 6;
-const MAX_TOTAL_IMAGES = 10;
-const MAX_IMAGES_PER_FILE = 8;
-
-interface ParseResult {
+export interface ParsedFile {
   text: string;
-  images: DocumentImage[];
-  error?: string;
+  images: string[];
+  fileName: string;
+  fileType: string;
 }
 
-/* ===========================
-   PDF Parsing
-   =========================== */
-async function parsePdf(file: File): Promise<ParseResult> {
+export interface FileParseError {
+  fileName: string;
+  error: string;
+}
+
+export function validateFiles(files: File[]): { valid: File[]; errors: FileParseError[] } {
+  const valid: File[] = [];
+  const errors: FileParseError[] = [];
+
+  if (files.length > FILE_LIMITS.maxFiles) {
+    errors.push({
+      fileName: '—',
+      error: `Maximum ${FILE_LIMITS.maxFiles} files allowed`,
+    });
+    return { valid, errors };
+  }
+
+  let totalSizeMB = 0;
+
+  for (const file of files) {
+    totalSizeMB += file.size / (1024 * 1024);
+
+    if (totalSizeMB > FILE_LIMITS.maxSizeMB) {
+      errors.push({
+        fileName: file.name,
+        error: `Total file size exceeds ${FILE_LIMITS.maxSizeMB}MB limit`,
+      });
+      continue;
+    }
+
+    const isAllowed = ALLOWED_FILE_TYPES.includes(file.type as any) ||
+      file.name.endsWith('.md') || file.name.endsWith('.txt');
+
+    if (!isAllowed) {
+      errors.push({
+        fileName: file.name,
+        error: 'Unsupported file type. Use PDF, DOCX, PPTX, TXT, or MD.',
+      });
+      continue;
+    }
+
+    valid.push(file);
+  }
+
+  return { valid, errors };
+}
+
+export async function parseFile(file: File): Promise<ParsedFile> {
+  const fileName = file.name;
+  const fileType = file.type;
+  const ext = fileName.split('.').pop()?.toLowerCase();
+
+  if (fileType === 'application/pdf' || ext === 'pdf') {
+    return parsePDF(file);
+  }
+  if (
+    fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    ext === 'docx'
+  ) {
+    return parseDOCX(file);
+  }
+  if (
+    fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+    ext === 'pptx'
+  ) {
+    return parsePPTX(file);
+  }
+  if (fileType === 'text/plain' || ext === 'txt') {
+    return parseTextFile(file);
+  }
+  if (fileType === 'text/markdown' || ext === 'md') {
+    return parseTextFile(file);
+  }
+
+  throw new Error(`Unsupported file type: ${fileType}`);
+}
+
+async function parsePDF(file: File): Promise<ParsedFile> {
   const pdfjsLib = await import('pdfjs-dist');
-  const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = String(pdfjsWorker.default || pdfjsWorker);
+
+  // Set worker path
+  const workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url
+  ).toString();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
   let text = '';
-  const images: DocumentImage[] = [];
+  const images: string[] = [];
+  const maxPages = Math.min(pdf.numPages, 8);
 
-  for (let i = 1; i <= pdf.numPages; i++) {
+  for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = (content.items as any[])
-      .filter((item: any) => typeof item.str === 'string')
+    const textContent = await page.getTextContent();
+
+    // Extract text
+    const pageText = textContent.items
       .map((item: any) => item.str)
       .join(' ');
     text += `[Page ${i}]\n${pageText}\n\n`;
 
-    // Render page as image (up to max pages)
-    if (images.length < MAX_IMAGES_PER_FILE && i <= 8) {
-      const viewport = page.getViewport({ scale: 0.5 });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        await (page as any).render({ canvasContext: ctx, viewport }).promise;
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-        images.push({
-          id: `pdf-${file.name}-${i}`,
-          dataUrl,
-          alt: `Page ${i}`,
-        });
+    // Render page to canvas for image capture
+    if (images.length < FILE_LIMITS.maxImagesPerFile) {
+      try {
+        const viewport = page.getViewport({ scale: 0.5 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          await page.render({ canvas, viewport }).promise;
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          images.push(dataUrl);
+        }
+      } catch {
+        // Skip image rendering for this page
       }
     }
   }
 
-  return { text: text.trim(), images };
+  return { text, images, fileName: file.name, fileType: 'pdf' };
 }
 
-/* ===========================
-   DOCX Parsing
-   =========================== */
-async function parseDocx(file: File): Promise<ParseResult> {
+async function parseDOCX(file: File): Promise<ParsedFile> {
   const mammoth = await import('mammoth');
+
   const arrayBuffer = await file.arrayBuffer();
-  const images: DocumentImage[] = [];
-  let imageCount = 0;
+  const result = await mammoth.convertToHtml({ arrayBuffer });
 
-  // Extract raw text
-  const textResult = await mammoth.extractRawText({ arrayBuffer });
-  let text = textResult.value || '';
+  // Extract text from HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = result.value;
+  const text = tempDiv.textContent || tempDiv.innerText || '';
 
-  // Also try HTML conversion to harvest images
-  const htmlResult = await mammoth.convertToHtml(
-    { arrayBuffer },
-    {
-      convertImage: mammoth.images.imgElement(async (image: { contentType: string; readAsBase64String: () => Promise<string> }) => {
-        if (imageCount >= MAX_IMAGES_PER_FILE) return { src: '' };
-        try {
-          const base64 = await image.readAsBase64String();
-          const dataUrl = `data:${image.contentType};base64,${base64}`;
-          imageCount++;
-          images.push({
-            id: `docx-img-${file.name}-${imageCount}`,
-            dataUrl,
-            alt: `Document image ${imageCount}`,
-          });
-          return { src: dataUrl };
-        } catch {
-          return { src: '' };
-        }
-      }),
-    },
-  );
+  const images: string[] = [];
 
-  // If mammoth extracted less meaningful text, maybe use the HTML
-  if (text.length < 20 && htmlResult.value) {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlResult.value;
-    text = tempDiv.textContent || tempDiv.innerText || text;
+  // Extract images from the HTML (mammoth embeds them as img tags with src)
+  const imgElements = tempDiv.querySelectorAll('img');
+  for (const img of imgElements) {
+    const src = img.getAttribute('src');
+    if (src && src.startsWith('data:') && images.length < FILE_LIMITS.maxImagesPerFile) {
+      images.push(src);
+    }
   }
 
-  return { text: text.trim(), images };
+  return { text, images, fileName: file.name, fileType: 'docx' };
 }
 
-/* ===========================
-   PPTX Parsing
-   =========================== */
-async function parsePptx(file: File): Promise<ParseResult> {
-  const JSZip = await import('jszip');
+async function parsePPTX(file: File): Promise<ParsedFile> {
+  const JSZip = (await import('jszip')).default;
   const arrayBuffer = await file.arrayBuffer();
   const zip = await JSZip.loadAsync(arrayBuffer);
 
   let text = '';
-  const images: DocumentImage[] = [];
-  let imageCount = 0;
+  const images: string[] = [];
+  let slideNum = 0;
 
-  // Extract text from slide XMLs
-  const slideFiles = Object.keys(zip.files).filter((name) =>
-    name.match(/ppt\/slides\/slide\d+\.xml$/),
-  );
-  slideFiles.sort();
+  // Process slide XML files
+  const slideFiles = Object.keys(zip.files)
+    .filter((name) => name.match(/^ppt\/slides\/slide\d+\.xml$/))
+    .sort();
 
   for (const slidePath of slideFiles) {
-    const slideNum = slidePath.match(/slide(\d+)\.xml$/)?.[1] || '';
-    const content = await zip.files[slidePath].async('string');
-    const textMatches = content.matchAll(/<a:t[^>]*>([^<]+)<\/a:t>/g);
-    const slideText: string[] = [];
-    for (const match of textMatches) {
-      slideText.push(match[1]);
-    }
-    if (slideText.length > 0) {
-      text += `[Slide ${slideNum}]\n${slideText.join(' ')}\n\n`;
-    }
-  }
+    slideNum++;
+    const slideXml = await zip.files[slidePath].async('text');
 
-  // Extract images from ppt/media
-  const mediaFiles = Object.keys(zip.files).filter(
-    (name) =>
-      name.startsWith('ppt/media/') &&
-      !name.endsWith('/') &&
-      imageCount < MAX_IMAGES_PER_FILE,
-  );
+    // Extract text from slide XML
+    const textMatches = slideXml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) || [];
+    const slideText = textMatches
+      .map((m: string) => m.replace(/<[^>]+>/g, ''))
+      .join(' ');
+    text += `[Slide ${slideNum}]\n${slideText}\n\n`;
 
-  for (const mediaPath of mediaFiles) {
-    if (imageCount >= MAX_IMAGES_PER_FILE) break;
-    try {
-      const blob = await zip.files[mediaPath].async('blob');
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      imageCount++;
-      images.push({
-        id: `pptx-${mediaPath.split('/').pop()}`,
-        dataUrl,
-        alt: `Slide image ${imageCount}`,
-      });
-    } catch {
-      // skip images that fail
-    }
-  }
+    // Extract images
+    if (images.length < FILE_LIMITS.maxImagesPerFile) {
+      const imgRels = Object.keys(zip.files).filter(
+        (name) =>
+          name.includes(`ppt/slides/_rels/slide${slideNum}`) &&
+          name.endsWith('.rels')
+      );
 
-  return { text: text.trim(), images };
-}
+      for (const relPath of imgRels) {
+        const relXml = await zip.files[relPath].async('text');
+        const imgRefs = relXml.match(/Target="[^"]*media\/[^"]+"/g) || [];
 
-/* ===========================
-   TXT/MD Parsing
-   =========================== */
-async function parseTextFile(file: File): Promise<ParseResult> {
-  const text = await file.text();
-  return { text: text.trim(), images: [] };
-}
+        for (const ref of imgRefs) {
+          const target = ref.replace(/Target="/, '').replace(/"$/, '');
+          const imgPath = `ppt/${target}`;
 
-/* ===========================
-   Main Parser
-   =========================== */
-export async function parseFile(file: File): Promise<ParseResult> {
-  if (file.size > MAX_FILE_SIZE) {
-    return { text: '', images: [], error: `File "${file.name}" exceeds 15 MB limit` };
-  }
-
-  const ext = file.name.split('.').pop()?.toLowerCase();
-
-  try {
-    switch (ext) {
-      case 'pdf':
-        return await parsePdf(file);
-      case 'docx':
-        return await parseDocx(file);
-      case 'pptx':
-        return await parsePptx(file);
-      case 'txt':
-      case 'md':
-        return await parseTextFile(file);
-      default:
-        return { text: '', images: [], error: `Unsupported file type: .${ext}` };
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return {
-      text: '',
-      images: [],
-      error: `Failed to parse "${file.name}": ${message}`,
-    };
-  }
-}
-
-export async function parseMultipleFiles(files: File[]): Promise<{
-  text: string;
-  images: DocumentImage[];
-  errors: string[];
-}> {
-  if (files.length > MAX_FILES) {
-    return {
-      text: '',
-      images: [],
-      errors: [`Maximum ${MAX_FILES} files allowed`],
-    };
-  }
-
-  clearDocumentImages();
-  let allText = '';
-  const allImages: DocumentImage[] = [];
-  const errors: string[] = [];
-
-  for (const file of files) {
-    const result = await parseFile(file);
-    if (result.error) {
-      errors.push(result.error);
-    } else {
-      if (result.text) {
-        allText += `\n\n=== ${file.name} ===\n\n${result.text}`;
-      }
-      // Track images globally
-      for (const img of result.images) {
-        if (allImages.length < MAX_TOTAL_IMAGES) {
-          allImages.push(img);
-          addDocumentImage(img);
+          if (zip.files[imgPath] && images.length < FILE_LIMITS.maxImagesPerFile) {
+            const imgBlob = await zip.files[imgPath].async('blob');
+            const dataUrl = await blobToDataURL(imgBlob);
+            images.push(dataUrl);
+          }
         }
       }
     }
   }
 
-  return {
-    text: allText.trim(),
-    images: allImages,
-    errors,
-  };
+  return { text, images, fileName: file.name, fileType: 'pptx' };
+}
+
+async function parseTextFile(file: File): Promise<ParsedFile> {
+  const text = await file.text();
+  return { text, images: [], fileName: file.name, fileType: 'text' };
+}
+
+function blobToDataURL(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }

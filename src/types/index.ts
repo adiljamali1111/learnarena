@@ -1,8 +1,7 @@
-/* ──────────────────────────────────────────
-   LearnArena — Type Definitions
-   ────────────────────────────────────────── */
+// ─── API Provider ───
+export type APIProvider = 'openrouter' | 'google';
 
-// ── Tab / Navigation ──────────────────────
+// ─── Tab Navigation ───
 export const TabKey = {
   Dashboard: 'dashboard',
   MyUniverse: 'my-universe',
@@ -11,104 +10,145 @@ export const TabKey = {
 } as const;
 export type TabKey = (typeof TabKey)[keyof typeof TabKey];
 
-// ── API ───────────────────────────────────
-export type APIProvider = 'openrouter' | 'google' | 'anthropic';
+// ─── OpenRouter Response ───
+export interface DashboardData {
+  moduleTitle: string;
+  moduleEmoji: string;
+  globalDifficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  synthesis: SynthesisData;
+  coreConcepts: CoreConcept[];
+  contextGraph: ContextNode[];
+  scenarios: Scenario[];
+  quiz: QuizQuestion[];
+  xpAwarded: number;
+}
 
-// ── Core Concept ──────────────────────────
+// ─── ModuleSynthesis ───
+export interface SynthesisData {
+  summary: string;
+  audioTabs: AudioTab[];
+}
+
+export interface AudioTab {
+  title: string;
+  content: string;
+}
+
+// ─── CoreConceptDeck ───
 export interface CoreConcept {
   id: string;
   term: string;
-  emoji: string;
   definition: string;
+  emoji: string;
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
-// ── Quiz / Diagnostic Question ────────────
+// ─── ContextMap ───
+export interface ContextNode {
+  id: string;
+  label: string;
+  description: string;
+  group: number;
+  connections: string[];
+}
+
+// ─── ScenarioSandbox / WhatIfLab ───
+export interface Scenario {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  exampleResponse: string;
+}
+
+// ─── DiagnosticQuest ───
 export interface QuizQuestion {
   id: string;
   question: string;
   options: string[];
   correctIndex: number;
   explanation: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  conceptId?: string;
+  topic: string;
 }
 
-// ── Recall Card ───────────────────────────
+// ─── Practice Duel ───
+export const DuelPhase = {
+  Idle: 'idle',
+  DifficultySelect: 'difficulty-select',
+  Preparing: 'preparing',
+  Playing: 'playing',
+  Done: 'done',
+} as const;
+export type DuelPhase = (typeof DuelPhase)[keyof typeof DuelPhase];
+
+export type DuelDifficulty = 'easy' | 'medium' | 'hard' | 'extreme';
+
+export interface DuelState {
+  phase: DuelPhase;
+  difficulty: DuelDifficulty;
+  lives: number;
+  score: number;
+  combo: number;
+  maxCombo: number;
+  currentQuestionIndex: number;
+  questions: QuizQuestion[];
+  correctAnswers: number;
+  wrongAnswers: number;
+  timeLeft: number;
+  rivalScore: number;
+  playerAnswered: boolean;
+  aiAnswered: boolean;
+  lastAnswerCorrect: boolean | null;
+  rivalChoice: number | null;
+}
+
+// ─── MasteryProgress ───
+export interface XPState {
+  current: number;
+  level: number;
+  totalForNextLevel: number;
+}
+
+// ─── RecallCards ───
 export interface RecallCard {
   id: string;
   front: string;
   back: string;
-  emoji?: string;
-  difficulty?: 'easy' | 'medium' | 'hard';
+  emoji: string;
+  difficulty: 'easy' | 'medium' | 'hard';
   known: boolean | null;
 }
 
-// ── Context Graph Node ────────────────────
-export interface ContextGraphNode {
-  id: string;
+// ─── Learner's Den Tools ───
+export const DenToolId = {
+  AudioOverview: 'audio-overview',
+  MindMap: 'mind-map',
+  Presentation: 'presentation',
+  RecallCards: 'recall-cards',
+  VisualBreakdown: 'visual-breakdown',
+  StudyReport: 'study-report',
+  WhatIfLab: 'what-if-lab',
+} as const;
+export type DenToolId = (typeof DenToolId)[keyof typeof DenToolId];
+
+export interface DenTool {
+  id: DenToolId;
   label: string;
-  emoji?: string;
-  children?: ContextGraphNode[];
-  connections?: string[];
+  icon: string;
+  description: string;
 }
 
-// Alias for ContextMap component
-export type ContextNode = ContextGraphNode;
-
-// ── Synthesis ────────────────────────────
-export interface SynthesisData {
-  summary: string;
-  keyTakeaways: string[];
-  recommendedNext: string[];
-  audioTabs?: Array<{ title: string; url: string }>;
-}
-
-// ── Dashboard Data ────────────────────────
-export interface DashboardData {
-  moduleTitle: string;
-  moduleEmoji: string;
-  globalDifficulty: 'beginner' | 'intermediate' | 'advanced';
-  synthesis: SynthesisData;
-  contextGraph: ContextGraphNode[];
-  coreConcepts: CoreConcept[];
-  quiz: QuizQuestion[];
-  recallCards: RecallCard[];
-}
-
-// ── Notification ──────────────────────────
+// ─── Notifications ───
 export interface Notification {
   id: string;
   message: string;
-  type: 'success' | 'error' | 'warning' | 'info';
-  read: boolean;
+  type: 'info' | 'success' | 'warning' | 'error';
   timestamp: number;
+  read: boolean;
 }
 
-// ── XP State ─────────────────────────────
-export interface XpState {
-  level: number;
-  current: number;
-  totalForNextLevel: number;
-}
-
-// ── Parsed Document ──────────────────────
-export interface ParsedDocument {
-  title: string;
-  content: string;
-  type: 'pdf' | 'txt' | 'md' | 'docx' | 'pptx';
-  pageCount?: number;
-}
-
-// ── Notes Input ──────────────────────────
-export interface NotesInputData {
-  text: string;
-  images: string[];
-  fileName?: string;
-}
-
-// ── Module Record (for MyUniverse) ────────
-export interface ModuleRecord {
+// ─── Module Storage ───
+export interface ModuleSummary {
   id: string;
   title: string;
   emoji: string;
@@ -116,72 +156,47 @@ export interface ModuleRecord {
   createdAt: number;
   progress: number;
   questionCount: number;
-  xp: number;
+  xp: number; // topic XP (0-400)
 }
 
-// ── Legacy module type (for old service files) ──
-export interface Module {
-  id: string;
-  title: string;
-  emoji: string;
-  description: string;
-  content: string;
-  concepts: CoreConcept[];
-  diagnosticQuestions: QuizQuestion[];
-  practiceQuestions: QuizQuestion[];
-  recallCards: RecallCard[];
-  createdAt: number;
-  xp: number;
-  mastery: number;
-  completed: boolean;
-}
-
-export interface GenerateModulesPayload {
-  notesText: string;
-  notesTitle: string;
-  provider: APIProvider;
-}
-
-// ── Dashboard State ───────────────────────
-export interface DashboardState {
+// ─── App State ───
+export interface AppState {
+  apiKey: string;
+  apiProvider: APIProvider;
   activeTab: TabKey;
   dashboard: DashboardData | null;
-  apiKey: string | null;
-  apiProvider: APIProvider;
+  activeNote: string;
   isGenerating: boolean;
-  activeNote: string | null;
-  modules: ModuleRecord[];
-  recallCardsState: RecallCard[];
-  seenQuestions: Set<string>;
-  xp: XpState;
-  notifications: Notification[];
+  modules: ModuleSummary[];
+  seenQuestions: string[];
+  duel: DuelState;
+  xp: XPState;
   cumulativeXp: number;
+  recallCards: RecallCard[];
+  notifications: Notification[];
 }
 
-// ── Dashboard Actions ─────────────────────
-export type DashboardAction =
-  | { type: 'SET_ACTIVE_TAB'; payload: TabKey }
-  | { type: 'SET_DASHBOARD'; payload: DashboardData | null }
+// ─── Actions ───
+export type AppAction =
   | { type: 'SET_API_KEY'; payload: string }
   | { type: 'SET_API_PROVIDER'; payload: APIProvider }
+  | { type: 'SET_ACTIVE_TAB'; payload: TabKey }
+  | { type: 'SET_DASHBOARD'; payload: DashboardData }
+  | { type: 'SET_ACTIVE_NOTE'; payload: string }
   | { type: 'SET_GENERATING'; payload: boolean }
-  | { type: 'SET_ACTIVE_NOTE'; payload: string | null }
-  | { type: 'ADD_MODULE'; payload: ModuleRecord }
+  | { type: 'ADD_MODULE'; payload: ModuleSummary }
   | { type: 'REMOVE_MODULE'; payload: string }
   | { type: 'UPDATE_MODULE_PROGRESS'; payload: { id: string; progress: number } }
+  | { type: 'SET_DUEL'; payload: Partial<DuelState> }
+  | { type: 'RESET_DUEL' }
+  | { type: 'ADD_SEEN_QUESTION'; payload: string }
+  | { type: 'SET_XP'; payload: XPState }
+  | { type: 'ADD_XP'; payload: number }
+  | { type: 'ADD_TOPIC_XP'; payload: { moduleId: string; amount: number } }
+  | { type: 'SET_CUMULATIVE_XP'; payload: number }
   | { type: 'SET_RECALL_CARDS'; payload: RecallCard[] }
   | { type: 'UPDATE_RECALL_CARD'; payload: { id: string; known: boolean } }
-  | { type: 'ADD_SEEN_QUESTION'; payload: string }
-  | { type: 'ADD_TOPIC_XP'; payload: { moduleId: string; amount: number } }
-  | { type: 'ADD_XP'; payload: number }
-  | { type: 'ADD_NOTIFICATION'; payload: { message: string; type: Notification['type'] } }
+  | { type: 'ADD_NOTIFICATION'; payload: Notification }
   | { type: 'MARK_NOTIFICATION_READ'; payload: string }
   | { type: 'CLEAR_NOTIFICATIONS' }
-  | { type: 'RESET' };
-
-// ── AI Response ───────────────────────────
-export interface AIResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
+  | { type: 'LOAD_STATE'; payload: Partial<AppState> };

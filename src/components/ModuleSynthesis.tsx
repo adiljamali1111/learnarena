@@ -54,6 +54,7 @@ export default function ModuleSynthesis({ data }: Props) {
   const deepDiveSections = parseDeepDiveSections();
   const keyTakeaways = data.audioTabs.find(t => t.title === 'Key Takeaways')?.content || '';
 
+  // Extract terminology-inspired chips from data
   const terminologyChips = [
     { term: 'Core Analysis', color: 'bg-primary/20 text-primary' },
     { term: 'Context Mapping', color: 'bg-accent/20 text-accent' },
@@ -69,6 +70,7 @@ export default function ModuleSynthesis({ data }: Props) {
         <h2 className="font-heading text-base tracking-wider text-text-primary">Module Synthesis</h2>
       </div>
 
+      {/* Mode selector */}
       <div className="flex flex-wrap gap-2 mb-5">
         {modes.map((mode) => (
           <button
@@ -86,6 +88,7 @@ export default function ModuleSynthesis({ data }: Props) {
         ))}
       </div>
 
+      {/* ─── SUMMARY MODE ─── */}
       {activeMode === 'summary' && (
         <div className="animate-fade-in max-w-2xl">
           <p className="text-text-muted text-xs mb-4 flex items-center gap-1">
@@ -114,12 +117,14 @@ export default function ModuleSynthesis({ data }: Props) {
         </div>
       )}
 
+      {/* ─── OVERVIEW MODE ─── */}
       {activeMode === 'overview' && (
         <div className="animate-fade-in">
           <p className="text-text-muted text-xs mb-4 flex items-center gap-1">
             <Layers size={12} /> Structural map — what and why
           </p>
 
+          {/* Terminology chips */}
           <div className="flex flex-wrap gap-2 mb-5">
             {terminologyChips.map((chip) => (
               <span key={chip.term} className={`px-2.5 py-1 rounded-full text-[10px] font-heading ${chip.color}`}>
@@ -128,6 +133,7 @@ export default function ModuleSynthesis({ data }: Props) {
             ))}
           </div>
 
+          {/* Collapsible accordion sections */}
           <div className="space-y-2">
             {overviewSections.map((section, si) => {
               const isExpanded = expandedSections[`overview-${si}`] ?? true;
@@ -155,6 +161,7 @@ export default function ModuleSynthesis({ data }: Props) {
             })}
           </div>
 
+          {/* Feature/topic matrix */}
           <div className="mt-5 p-4 rounded-lg bg-bg-elevated/50">
             <p className="font-heading text-xs text-text-primary tracking-wider mb-3">Topic Matrix</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -168,8 +175,10 @@ export default function ModuleSynthesis({ data }: Props) {
         </div>
       )}
 
+      {/* ─── DEEP DIVE MODE ─── */}
       {activeMode === 'deepdive' && (
         <div className="animate-fade-in flex flex-col md:flex-row gap-5">
+          {/* TOC sidebar */}
           <div className="md:w-48 shrink-0">
             <p className="font-heading text-xs text-text-muted tracking-wider mb-3 uppercase">Contents</p>
             <nav className="space-y-1 sticky top-4">
@@ -188,6 +197,7 @@ export default function ModuleSynthesis({ data }: Props) {
             </nav>
           </div>
 
+          {/* Content */}
           <div className="flex-1 min-w-0">
             <p className="text-text-muted text-xs mb-4 flex items-center gap-1">
               <BookMarked size={12} /> Granular technical analysis
