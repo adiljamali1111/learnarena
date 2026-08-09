@@ -1,23 +1,33 @@
 import { useState, useRef } from 'react';
-import { FlaskConical, Eye, EyeOff, PenLine } from 'lucide-react';
+import { FlaskConical, Eye, EyeOff, PenLine, RefreshCw } from 'lucide-react';
 import type { Scenario } from '../../types/dashboard';
 
 interface Props {
   data: Scenario;
+  onRefresh?: () => Promise<void>;
 }
 
-export default function ScenarioSandboxCard({ data }: Props) {
+export default function ScenarioSandboxCard({ data, onRefresh }: Props) {
   const [answer, setAnswer] = useState('');
   const [showModelAnswer, setShowModelAnswer] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const correctOption = data.options.find((o) => o.isCorrect);
 
   const handleReveal = () => {
-    if (!showModelAnswer) {
-      setShowModelAnswer(true);
-    } else {
-      setShowModelAnswer(false);
+    setShowModelAnswer((prev) => !prev);
+  };
+
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    setAnswer('');
+    setShowModelAnswer(false);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -28,7 +38,22 @@ export default function ScenarioSandboxCard({ data }: Props) {
         <div className="w-9 h-9 rounded-xl bg-warning/20 flex items-center justify-center">
           <FlaskConical size={18} className="text-warning" />
         </div>
-        <h3 className="font-heading font-semibold text-lg">Scenario Sandbox</h3>
+        <h3 className="font-heading font-semibold text-lg flex-1">Scenario Sandbox</h3>
+
+        {onRefresh && (
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-warning/20 flex items-center justify-center transition-colors disabled:opacity-40 cursor-pointer shrink-0"
+            title="Generate new scenario"
+            aria-label="Generate new scenario"
+          >
+            <RefreshCw
+              size={14}
+              className={`text-warning ${refreshing ? 'animate-spin' : ''}`}
+            />
+          </button>
+        )}
       </div>
 
       {/* Scenario */}

@@ -2,6 +2,7 @@ import type {
   DashboardData,
   DiagnosticQuestion,
   DuelQuestion,
+  Scenario,
 } from '../types/dashboard';
 
 const API_BASE = 'https://openrouter.ai/api/v1/chat/completions';
@@ -265,6 +266,38 @@ export async function generateFreshQuestions(
     `Generate 12 duel questions from these notes:\n\n${notes}`,
   );
   return result.questions || [];
+}
+
+/* ===========================
+   Scenario Generation — standalone refresh
+   =========================== */
+
+const SCENARIO_SYSTEM_PROMPT = `You are a case study creator. Given study notes, generate a single realistic scenario that tests applied understanding. Return exactly this JSON structure:
+
+{
+  "title": "string — scenario title (10-15 words)",
+  "context": "string — 3-4 sentence case study describing a realistic situation",
+  "options": [
+    {
+      "id": "string — e.g. 'a', 'b', 'c', 'd'",
+      "text": "string — option text",
+      "isCorrect": "boolean — exactly one true",
+      "explanation": "string — detailed explanation why this is right/wrong (2-3 sentences)"
+    }
+  ]
+}
+
+Generate exactly 4 options with exactly one correct. Make the scenario challenging but fair — it should require applying concepts from the notes, not just recall. Ensure the explanation is educational.`;
+
+export async function generateScenario(
+  apiKey: string,
+  notes: string,
+): Promise<Scenario> {
+  return apiCall<Scenario>(
+    apiKey,
+    SCENARIO_SYSTEM_PROMPT,
+    `Generate a new applied scenario from these notes:\n\n${notes}`,
+  );
 }
 
 export async function generateDenContent<T>(

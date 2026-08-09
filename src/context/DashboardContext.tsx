@@ -17,7 +17,7 @@ import type {
   DocumentImage,
 } from '../types/dashboard';
 import { getComboMultiplier, getComboLevel } from '../types/dashboard';
-import { generateDashboard, generateDiagnosticQuestions, generateFreshQuestions } from '../services/openrouter';
+import { generateDashboard, generateDiagnosticQuestions, generateFreshQuestions, generateScenario } from '../services/openrouter';
 import { parseMultipleFiles } from '../services/fileParser';
 import {
   clearSeenForModule,
@@ -77,6 +77,8 @@ interface DashboardContextValue {
   resetDuel: () => void;
   // Diagnostic refresh
   refreshDiagnosticQuestions: () => Promise<void>;
+  // Scenario refresh
+  refreshScenario: () => Promise<void>;
   // Den actions
   openDenTool: (tool: DenToolKey) => void;
   closeDenTool: () => void;
@@ -611,6 +613,48 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [saveState, addNotification, state.modules, state.activeModuleId]);
 
   /* ===========================
+     Scenario Refresh
+     =========================== */
+  const refreshScenario = useCallback(async () => {
+    const apiKey = localStorage.getItem(API_KEY_KEY);
+    const activeModule = state.modules.find(
+      (m) => m.id === state.activeModuleId,
+    );
+    if (!apiKey || !activeModule || !activeModule.dashboard) return;
+
+    try {
+      const newScenario = await generateScenario(
+        apiKey,
+        activeModule.notes,
+      );
+
+      saveState((s) => ({
+        ...s,
+        modules: s.modules.map((m) =>
+          m.id === s.activeModuleId
+            ? {
+                ...m,
+                dashboard: m.dashboard
+                  ? { ...m.dashboard, scenario: newScenario }
+                  : m.dashboard,
+              }
+            : m,
+        ),
+      }));
+
+      addNotification({
+        type: 'info',
+        message: 'New scenario generated! Apply what you\'ve learned.',
+        read: false,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to refresh scenario';
+      addNotification({ type: 'error', message, read: false });
+    }
+  }, [saveState, addNotification, state.modules, state.activeModuleId]);
+
+  /* ===========================
      Learner's Den
      =========================== */
   const openDenTool = useCallback(
@@ -648,6 +692,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     closeDuelHint,
     resetDuel,
     refreshDiagnosticQuestions,
+    refreshScenario,
     openDenTool,
     closeDenTool,
     setActiveModule,
