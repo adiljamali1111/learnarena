@@ -16,6 +16,7 @@ import {
   Swords,
   Sparkles,
   Zap,
+  Settings,
 } from 'lucide-react';
 import type { TabKey } from './types/dashboard';
 
@@ -94,10 +95,12 @@ function Header() {
         <NotificationPanel />
 
         <button
-          onClick={() => setModal('notesInput')}
-          className="btn-base px-3 py-2 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white text-xs font-semibold hover:shadow-glow-purple transition-all"
+          onClick={() => setModal('apiKey')}
+          className="btn-base w-9 h-9 rounded-xl bg-white/5 border border-glass-border flex items-center justify-center text-muted hover:text-foreground hover:border-accent/40 hover:shadow-glow-purple-sm transition-all cursor-pointer"
+          aria-label="OpenRouter API Key"
+          title="OpenRouter API Key"
         >
-          + New
+          <Settings size={16} />
         </button>
       </div>
     </header>
