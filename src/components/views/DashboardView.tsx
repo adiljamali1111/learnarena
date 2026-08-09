@@ -1,7 +1,7 @@
 import { useDashboard } from '../../context/DashboardContext';
 import ModuleSynthesisCard from '../cards/ModuleSynthesisCard';
 import CoreConceptDeckCard from '../cards/CoreConceptDeckCard';
-import ContextMapCard from '../cards/ContextMapCard';
+
 import ScenarioSandboxCard from '../cards/ScenarioSandboxCard';
 import DiagnosticQuestCard from '../cards/DiagnosticQuestCard';
 import MasteryProgressCard from '../cards/MasteryProgressCard';
@@ -104,11 +104,6 @@ export default function DashboardView() {
         {/* Core Concepts */}
         <div className="lg:col-span-1">
           <CoreConceptDeckCard data={dashboard.coreConcepts} />
-        </div>
-
-        {/* Context Map */}
-        <div className="lg:col-span-2">
-          <ContextMapCard data={dashboard.contextMap} />
         </div>
 
         {/* Scenario Sandbox — narrower for quick interaction */}
