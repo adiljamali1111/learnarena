@@ -1,10 +1,13 @@
 import { Library, Search, Trash2, ArrowRight, BookOpen } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useDashboard } from '../../context/DashboardContext';
+import MasteryProgressCard from '../cards/MasteryProgressCard';
 
 export default function MyUniverseView() {
   const { state, loadModule, deleteModule, setModal } = useDashboard();
   const [search, setSearch] = useState('');
+
+  const activeModule = state.modules.find((m) => m.id === state.activeModuleId);
 
   const filteredModules = useMemo(() => {
     if (!search.trim()) return state.modules;
@@ -17,42 +20,54 @@ export default function MyUniverseView() {
   }, [state.modules, search]);
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
-            <Library size={20} className="text-accent" />
+    <div className="p-4 max-w-6xl mx-auto">
+      {/* Top row: header/search on left, Mastery Progress pinned right */}
+      <div className="flex flex-col lg:flex-row gap-4 mb-6 items-start">
+        {/* Left column — header + search */}
+        <div className="flex-1 min-w-0 w-full lg:w-auto">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+                <Library size={20} className="text-accent" />
+              </div>
+              <div>
+                <h2 className="font-heading font-semibold text-xl">My Universe</h2>
+                <p className="text-xs text-muted">
+                  {state.modules.length} module{state.modules.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setModal('notesInput')}
+              className="btn-base px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-sm font-semibold text-white hover:shadow-glow-purple transition-all"
+            >
+              + New Module
+            </button>
           </div>
-          <div>
-            <h2 className="font-heading font-semibold text-xl">My Universe</h2>
-            <p className="text-xs text-muted">
-              {state.modules.length} module{state.modules.length !== 1 ? 's' : ''}
-            </p>
+
+          {/* Search */}
+          <div className="relative">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-lighter"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search modules..."
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/5 border border-glass-border text-foreground placeholder-muted-lighter text-sm focus:outline-none focus:border-accent transition-colors"
+            />
           </div>
         </div>
 
-        <button
-          onClick={() => setModal('notesInput')}
-          className="btn-base px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-sm font-semibold text-white hover:shadow-glow-purple transition-all"
-        >
-          + New Module
-        </button>
-      </div>
-
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search
-          size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-lighter"
-        />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search modules..."
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/5 border border-glass-border text-foreground placeholder-muted-lighter text-sm focus:outline-none focus:border-accent transition-colors"
-        />
+        {/* Right column — Mastery Progress pinned top-right */}
+        {activeModule?.dashboard && (
+          <div className="w-full lg:w-80 shrink-0 lg:sticky lg:top-4">
+            <MasteryProgressCard data={activeModule.dashboard.masteryProgress} />
+          </div>
+        )}
       </div>
 
       {/* Empty state */}

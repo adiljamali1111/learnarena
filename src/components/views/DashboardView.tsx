@@ -4,7 +4,6 @@ import CoreConceptDeckCard from '../cards/CoreConceptDeckCard';
 
 import ScenarioSandboxCard from '../cards/ScenarioSandboxCard';
 import DiagnosticQuestCard from '../cards/DiagnosticQuestCard';
-import MasteryProgressCard from '../cards/MasteryProgressCard';
 import { Plus } from 'lucide-react';
 
 export default function DashboardView() {
@@ -120,11 +119,7 @@ export default function DashboardView() {
           />
         </div>
 
-        {/* Mastery Progress — full width on its row */}
-        <div className="lg:col-span-3">
-          <MasteryProgressCard data={dashboard.masteryProgress} />
         </div>
-      </div>
     </div>
   );
 }
