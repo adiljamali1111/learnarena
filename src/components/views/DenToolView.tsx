@@ -8,6 +8,7 @@ import type {
   VisualBreakdownData,
   StudyReportData,
 } from '../../types/dashboard';
+import MindMapTool from '../den/MindMapTool';
 import { Play, Pause, Square } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useDashboard } from '../../context/DashboardContext';
@@ -148,79 +149,6 @@ function AudioOverviewTool() {
                 <p className="text-xs text-muted line-clamp-2">{seg.text}</p>
               </button>
             ))}
-          </div>
-        </div>
-      )}
-    </DenToolShell>
-  );
-}
-
-/* ===========================
-   Mind Map Tool
-   =========================== */
-function MindMapTool() {
-  const { data, isLoading, error, regenerate } = useDenTool<MindMapData>('mindmap');
-
-  return (
-    <DenToolShell toolKey="mindmap" isLoading={isLoading} error={error} onRegenerate={regenerate}>
-      {data && (
-        <div className="flex flex-col items-center">
-          <div className="glass-card p-6 w-full overflow-x-auto">
-            <svg viewBox="0 0 800 500" className="w-full h-auto" style={{ minHeight: 350 }}>
-              {/* Central topic */}
-              <circle cx={400} cy={250} r={60} fill="#a855f7" opacity={0.3} />
-              <circle cx={400} cy={250} r={50} fill="#a855f7" opacity={0.5} />
-              <circle cx={400} cy={250} r={40} fill="#a855f7" />
-              <text x={400} y={255} textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">
-                {data.centralTopic}
-              </text>
-
-              {/* Branches */}
-              {data.branches.map((branch, bIdx) => {
-                const angle = (2 * Math.PI / data.branches.length) * bIdx - Math.PI / 2;
-                const bx = 400 + 120 * Math.cos(angle);
-                const by = 250 + 120 * Math.sin(angle);
-                const colors = ['#a855f7', '#00f0ff', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6'];
-
-                return (
-                  <g key={bIdx}>
-                    {/* Branch line */}
-                    <line x1={400} y1={250} x2={bx} y2={by} stroke={colors[bIdx % colors.length]} strokeWidth={2} opacity={0.5} />
-
-                    {/* Branch node */}
-                    <rect
-                      x={bx - 50}
-                      y={by - 18}
-                      width={100}
-                      height={36}
-                      rx={18}
-                      fill={colors[bIdx % colors.length]}
-                      opacity={0.2}
-                    />
-                    <text x={bx} y={by + 5} textAnchor="middle" fill={colors[bIdx % colors.length]} fontSize="11" fontWeight="bold">
-                      {branch.label}
-                    </text>
-
-                    {/* Children */}
-                    {branch.children.map((child, cIdx) => {
-                      const childAngle = angle + (cIdx - (branch.children.length - 1) / 2) * 0.3;
-                      const cx = bx + 80 * Math.cos(childAngle);
-                      const cy = by + 80 * Math.sin(childAngle);
-
-                      return (
-                        <g key={`${bIdx}-${cIdx}`}>
-                          <line x1={bx} y1={by} x2={cx} y2={cy} stroke={colors[bIdx % colors.length]} strokeWidth={1} opacity={0.3} />
-                          <circle cx={cx} cy={cy} r={6} fill={colors[bIdx % colors.length]} opacity={0.4} />
-                          <text x={cx} y={cy + 18} textAnchor="middle" fill="rgba(255,255,255,0.7)" fontSize="9">
-                            {child.length > 22 ? child.slice(0, 22) + '…' : child}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </g>
-                );
-              })}
-            </svg>
           </div>
         </div>
       )}
