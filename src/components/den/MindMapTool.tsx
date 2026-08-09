@@ -2,11 +2,16 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useDenTool } from './useDenTool';
 import DenToolShell from './DenToolShell';
 import type { MindMapData } from '../../types/dashboard';
-import { ZoomIn, ZoomOut, RotateCcw, Info, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, ZoomIn, ZoomOut, RotateCcw, ArrowUp, ArrowDown } from 'lucide-react';
 
 /* ===========================
-   Constants
+   Layout Constants — Horizontal Tree
    =========================== */
+
+const NODE_HEIGHT = 50;
+const VERTICAL_GAP = 20;
+const LEVEL_X: Record<0 | 1 | 2, number> = { 0: 80, 1: 320, 2: 600 };
+const NODE_WIDTH = 180;
 
 const COLORS = [
   '#a855f7', // purple
@@ -18,16 +23,13 @@ const COLORS = [
   '#ec4899', // pink
 ];
 
-const CENTER_X = 500;
-const CENTER_Y = 350;
-const BRANCH_RADIUS = 130;
-const CHILD_RADIUS = 100;
-const NODE_WIDTH = 160;
-const NODE_HEIGHT = 42;
-const CENTER_NODE_SIZE = 80;
+const NODE_PADDING = 36; // extra padding around pill text inside SVG pill
+const SVG_PADDING = 60;
+const CANVAS_W = 900;
+const CANVAS_H = 600;
 
 /* ===========================
-   Layout helpers
+   Layout Engine
    =========================== */
 
 interface LayoutNode {
@@ -40,297 +42,97 @@ interface LayoutNode {
   level: 0 | 1 | 2;
   parentId?: string;
   childIds: string[];
-  importance?: number;
+  childrenShown: boolean;
 }
 
-function buildLayout(data: MindMapData): {
-  nodes: LayoutNode[];
-  centerNode: LayoutNode;
-} {
+function buildLayout(data: MindMapData): { nodes: LayoutNode[] } {
   const nodes: LayoutNode[] = [];
+  const totalBranches = data.branches.length;
 
-  // Center node
-  const centerNode: LayoutNode = {
+  // ── Level 0: Root node ──
+  const root: LayoutNode = {
     id: 'center',
     label: data.centralTopic,
-    x: CENTER_X,
-    y: CENTER_Y,
+    x: LEVEL_X[0],
+    y: CANVAS_H / 2,
     color: '#a855f7',
     level: 0,
     childIds: data.branches.map((_, i) => `branch-${i}`),
+    childrenShown: true,
   };
-  nodes.push(centerNode);
+  nodes.push(root);
 
-  // Branch nodes (L1)
+  // ── Level 1: Branch nodes ──
+  let totalL2 = 0;
+  data.branches.forEach((b) => { totalL2 += b.children.length; });
+
+  // Distribute L1 nodes evenly in vert space
+  const l1TotalHeight = totalBranches * NODE_HEIGHT + (totalBranches - 1) * VERTICAL_GAP;
+  const l1StartY = (CANVAS_H - l1TotalHeight) / 2;
+
   data.branches.forEach((branch, bIdx) => {
-    const angle = (2 * Math.PI / data.branches.length) * bIdx - Math.PI / 2;
-    const bx = CENTER_X + BRANCH_RADIUS * Math.cos(angle);
-    const by = CENTER_Y + BRANCH_RADIUS * Math.sin(angle);
+    const by = l1StartY + bIdx * (NODE_HEIGHT + VERTICAL_GAP) + NODE_HEIGHT / 2;
 
     const branchNode: LayoutNode = {
       id: `branch-${bIdx}`,
       label: branch.label,
-      x: bx,
+      x: LEVEL_X[1],
       y: by,
       color: COLORS[bIdx % COLORS.length],
       level: 1,
       parentId: 'center',
       childIds: branch.children.map((_, cIdx) => `child-${bIdx}-${cIdx}`),
+      childrenShown: true,
     };
     nodes.push(branchNode);
 
-    // Child nodes (L2)
-    branch.children.forEach((child, cIdx) => {
-      const childAngle = angle + (cIdx - (branch.children.length - 1) / 2) * 0.35;
-      const cx = bx + CHILD_RADIUS * Math.cos(childAngle);
-      const cy = by + CHILD_RADIUS * Math.sin(childAngle);
+    // ── Level 2: Child nodes ──
+    const children = branch.children;
+    const l2Count = children.length;
+    const l2TotalHeight = l2Count * NODE_HEIGHT + (l2Count - 1) * VERTICAL_GAP;
+    const l2StartY = by - l2TotalHeight / 2 + NODE_HEIGHT / 2;
 
+    children.forEach((child, cIdx) => {
       nodes.push({
         id: `child-${bIdx}-${cIdx}`,
         label: child,
-        x: cx,
-        y: cy,
+        x: LEVEL_X[2],
+        y: l2StartY + cIdx * (NODE_HEIGHT + VERTICAL_GAP),
         color: COLORS[bIdx % COLORS.length],
         level: 2,
         parentId: `branch-${bIdx}`,
         childIds: [],
+        childrenShown: false,
       });
     });
   });
 
-  return { nodes, centerNode };
+  return { nodes };
 }
 
 /* ===========================
-   Node Component
+   Edge Component — Smooth Cubic Bezier
    =========================== */
 
-interface MindMapNodeProps {
-  node: LayoutNode;
-  isCenter: boolean;
-  isCollapsed: boolean;
-  isExpanded: boolean;
-  collapsedChildCount: number;
-  isHighlighted: boolean;
-  isConnected: boolean;
-  isSelected: boolean;
-  animated: boolean;
-  onToggle: (id: string) => void;
-  onSelect: (id: string) => void;
-  onHover: (id: string | null) => void;
-}
-
-function MindMapNode({
-  node,
-  isCenter,
-  isCollapsed,
-  isExpanded,
-  collapsedChildCount,
-  isHighlighted,
-  isConnected,
-  isSelected,
-  animated,
-  onToggle,
-  onSelect,
-  onHover,
-}: MindMapNodeProps) {
-  const hasChildren = node.childIds.length > 0;
-  const isCollapsible = hasChildren && !isCenter;
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isCollapsible) {
-      onToggle(node.id);
-    } else {
-      onSelect(node.id);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      if (isCollapsible) {
-        onToggle(node.id);
-      } else {
-        onSelect(node.id);
-      }
-    }
-  };
-
-  if (isCenter) {
-    return (
-      <g
-        onClick={(e) => { e.stopPropagation(); onSelect(node.id); }}
-        onKeyDown={handleKeyDown}
-        role="button"
-        tabIndex={0}
-        aria-label={`Central concept: ${node.label}`}
-        onMouseEnter={() => onHover(node.id)}
-        onMouseLeave={() => onHover(null)}
-        className="cursor-pointer"
-      >
-        {/* Glow ring */}
-        {isSelected && (
-          <circle
-            cx={node.x}
-            cy={node.y}
-            r={CENTER_NODE_SIZE / 2 + 6}
-            fill="none"
-            stroke={node.color}
-            strokeWidth={2}
-            opacity={0.5}
-            className="animate-pulse-glow"
-          />
-        )}
-        {/* Center circle */}
-        <circle
-          cx={node.x}
-          cy={node.y}
-          r={CENTER_NODE_SIZE / 2}
-          fill={node.color}
-          opacity={isConnected ? 0.9 : 0.6}
-          className="transition-all duration-300"
-        />
-        <circle
-          cx={node.x}
-          cy={node.y}
-          r={CENTER_NODE_SIZE / 2 - 6}
-          fill="none"
-          stroke={node.color}
-          strokeWidth={1.5}
-          opacity={0.4}
-        />
-        <text
-          x={node.x}
-          y={node.y + 4}
-          textAnchor="middle"
-          fill="white"
-          fontSize="13"
-          fontWeight="bold"
-          className="pointer-events-none select-none"
-        >
-          {node.label.length > 20 ? node.label.slice(0, 20) + '…' : node.label}
-        </text>
-      </g>
-    );
-  }
-
-  // Glass pill container dimensions
-  const pillW = NODE_WIDTH;
-  const pillH = NODE_HEIGHT;
-  const rx = 12;
-
-  const alpha = isHighlighted ? 1 : isConnected ? 0.85 : isCollapsed ? 0.4 : 0.5;
-
-  return (
-    <g
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      role="button"
-      tabIndex={0}
-      aria-label={`${node.level === 1 ? 'Category' : 'Topic'}: ${node.label}${isCollapsed ? ', collapsed' : ''}`}
-      aria-expanded={isCollapsible ? !isCollapsed : undefined}
-      onMouseEnter={() => onHover(node.id)}
-      onMouseLeave={() => onHover(null)}
-      className="cursor-pointer"
-      style={{ transitionDelay: animated ? `${Math.random() * 100}ms` : '0ms' }}
-    >
-      {/* Pill background */}
-      <rect
-        x={node.x - pillW / 2}
-        y={node.y - pillH / 2}
-        width={pillW}
-        height={pillH}
-        rx={rx}
-        fill={`rgba(255,255,255,${alpha * 0.08})`}
-        stroke={isHighlighted || isSelected ? node.color : 'rgba(255,255,255,0.1)'}
-        strokeWidth={isSelected ? 2 : isHighlighted ? 1.5 : 0.5}
-        className={`transition-all duration-200 ${isHighlighted ? 'drop-shadow-glow' : ''}`}
-        style={{
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-        }}
-      />
-
-      {/* Label */}
-      <text
-        x={node.x}
-        y={node.y + 4}
-        textAnchor="middle"
-        fill={isHighlighted || isSelected ? '#ffffff' : 'rgba(255,255,255,0.85)'}
-        fontSize={node.level === 1 ? 11 : 10}
-        fontWeight={isHighlighted || isSelected ? 'bold' : 'normal'}
-        className="pointer-events-none select-none transition-all duration-200"
-      >
-        {node.label.length > 22 ? node.label.slice(0, 22) + '…' : node.label}
-      </text>
-
-      {/* Collapse/Expand indicator */}
-      {isCollapsible && (
-        <g transform={`translate(${node.x + pillW / 2 - 16}, ${node.y})`}>
-          <circle cx={0} cy={0} r={8} fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.2)" strokeWidth={0.5} />
-          {isCollapsed ? (
-            <ChevronRight size={10} className="text-muted" style={{ transform: 'translate(-5px, -5px)' }} />
-          ) : (
-            <ChevronDown size={10} className="text-muted" style={{ transform: 'translate(-5px, -5px)' }} />
-          )}
-        </g>
-      )}
-
-      {/* Child count badge */}
-      {isCollapsed && collapsedChildCount > 0 && (
-        <g transform={`translate(${node.x + pillW / 2 - 16}, ${node.y - pillH / 2 - 10})`}>
-          <rect
-            x={-12}
-            y={-8}
-            width={24}
-            height={16}
-            rx={8}
-            fill={node.color}
-            opacity={0.9}
-          />
-          <text
-            x={0}
-            y={3}
-            textAnchor="middle"
-            fill="white"
-            fontSize="9"
-            fontWeight="bold"
-            className="pointer-events-none select-none"
-          >
-            +{collapsedChildCount}
-          </text>
-        </g>
-      )}
-    </g>
-  );
-}
-
-/* ===========================
-   Edge Component
-   =========================== */
-
-interface MindMapEdgeProps {
-  sx: number;
-  sy: number;
-  tx: number;
-  ty: number;
+function MindMapEdge({
+  sx, sy, tx, ty, color, isHighlighted, isConnected, dashArray,
+}: {
+  sx: number; sy: number; tx: number; ty: number;
   color: string;
   isHighlighted: boolean;
   isConnected: boolean;
   dashArray?: string;
-}
-
-function MindMapEdge({ sx, sy, tx, ty, color, isHighlighted, isConnected, dashArray }: MindMapEdgeProps) {
-  const alpha = isHighlighted ? 0.8 : isConnected ? 0.4 : 0.15;
-  const strokeW = isHighlighted ? 2.5 : 1;
+}) {
+  const cx1 = sx + (tx - sx) * 0.4;
+  const cx2 = tx - (tx - sx) * 0.4;
+  const path = `M ${sx} ${sy} C ${cx1} ${sy}, ${cx2} ${ty}, ${tx} ${ty}`;
+  const alpha = isHighlighted ? 0.8 : isConnected ? 0.4 : 0.12;
+  const strokeW = isHighlighted ? 2.5 : 1.5;
 
   return (
-    <line
-      x1={sx}
-      y1={sy}
-      x2={tx}
-      y2={ty}
+    <path
+      d={path}
+      fill="none"
       stroke={isHighlighted ? color : 'rgba(255,255,255,0.2)'}
       strokeWidth={strokeW}
       opacity={alpha}
@@ -341,34 +143,28 @@ function MindMapEdge({ sx, sy, tx, ty, color, isHighlighted, isConnected, dashAr
 }
 
 /* ===========================
-   Detail Panel
+   Detail Panel (Bottom Sheet / Side Drawer)
    =========================== */
 
 function DetailPanel({
   node,
+  parentLabel,
   onClose,
 }: {
   node: LayoutNode | null;
+  parentLabel?: string;
   onClose: () => void;
 }) {
-  if (!node || node.id === 'center') return null;
+  if (!node) return null;
 
-  const label = node.label;
-  const levelName = node.level === 1 ? 'Category' : 'Subtopic';
+  const levelName = node.level === 1 ? 'Category' : node.level === 2 ? 'Subtopic' : 'Root';
 
   return (
-    <div
-      className="glass-card p-4 animate-fade-in-up"
-      role="dialog"
-      aria-label={`Details for ${label}`}
-    >
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span
-            className="w-2.5 h-2.5 rounded-full"
-            style={{ background: node.color }}
-          />
-          <h4 className="text-sm font-semibold text-foreground">{label}</h4>
+    <div className="glass-card p-5 animate-fade-in-up border-indigo-500/20" role="dialog" aria-label={`Details for ${node.label}`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2.5">
+          <span className="w-3 h-3 rounded-full" style={{ background: node.color }} />
+          <h4 className="text-sm font-semibold text-white">{node.label}</h4>
         </div>
         <button
           onClick={onClose}
@@ -381,26 +177,21 @@ function DetailPanel({
           </svg>
         </button>
       </div>
-      <p className="text-xs text-muted mb-2">
-        <span className="text-muted-lighter uppercase tracking-wider text-[10px]">{levelName}</span>
+
+      <div className="flex flex-wrap gap-2 mb-3">
+        <span className="text-[10px] uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">
+          {levelName}
+        </span>
+        {parentLabel && (
+          <span className="text-[10px] text-muted-lighter bg-white/5 px-2 py-0.5 rounded-full">
+            Under: {parentLabel}
+          </span>
+        )}
+      </div>
+
+      <p className="text-xs text-gray-300 leading-relaxed">
+        {node.description || `Explore this ${levelName.toLowerCase()} to deepen your understanding of "${node.label}".`}
       </p>
-      {node.importance && (
-        <div className="flex items-center gap-1">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <span
-              key={i}
-              className={`text-xs ${i < node.importance! ? 'text-gold' : 'text-muted-lighter'}`}
-            >
-              ★
-            </span>
-          ))}
-        </div>
-      )}
-      {node.parentId && (
-        <p className="text-[10px] text-muted-lighter mt-2">
-          Parent: {node.parentId === 'center' ? node.label : node.parentId}
-        </p>
-      )}
     </div>
   );
 }
@@ -416,11 +207,7 @@ export default function MindMapTool() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [animated, setAnimated] = useState(false);
-
-  // Pan & zoom state
-  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0 });
+  const [scrollY, setScrollY] = useState(0);
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Trigger entrance animation after mount
@@ -431,19 +218,20 @@ export default function MindMapTool() {
 
   // Reset view when data changes
   useEffect(() => {
-    setTransform({ x: 0, y: 0, scale: 1 });
+    setScrollY(0);
     setCollapsed(new Set());
     setSelectedNodeId(null);
     setHoveredNodeId(null);
   }, [data]);
 
-  const { nodes, centerNode } = data ? buildLayout(data) : { nodes: [] as LayoutNode[], centerNode: null as LayoutNode | null };
+  const { nodes } = data ? buildLayout(data) : { nodes: [] as LayoutNode[] };
+  const rootNode = nodes.find((n) => n.level === 0);
 
-  // Resolve which children are visible
+  // Resolve which nodes are visible based on collapsed state
   const visibleNodeIds = new Set<string>();
-  if (centerNode) {
-    visibleNodeIds.add(centerNode.id);
-    centerNode.childIds.forEach((cid) => {
+  if (rootNode) {
+    visibleNodeIds.add(rootNode.id);
+    rootNode.childIds.forEach((cid) => {
       visibleNodeIds.add(cid);
       if (!collapsed.has(cid)) {
         const child = nodes.find((n) => n.id === cid);
@@ -465,6 +253,9 @@ export default function MindMapTool() {
     highlightedNode.childIds.forEach((cid) => connectedIds.add(cid));
     if (highlightedNode.parentId) {
       connectedIds.add(highlightedNode.parentId);
+    }
+    // Also include siblings of the parent
+    if (highlightedNode.parentId) {
       const parent = nodes.find((n) => n.id === highlightedNode.parentId);
       if (parent) {
         parent.childIds.forEach((cid) => connectedIds.add(cid));
@@ -475,10 +266,7 @@ export default function MindMapTool() {
   // Edges to render
   const edges: { source: LayoutNode; target: LayoutNode; color: string }[] = [];
   visibleNodes.forEach((node) => {
-    if (node.level === 1 && centerNode) {
-      edges.push({ source: centerNode, target: node, color: node.color });
-    }
-    if (node.level === 2) {
+    if (node.parentId) {
       const parent = nodes.find((n) => n.id === node.parentId);
       if (parent && visibleNodeIds.has(parent.id)) {
         edges.push({ source: parent, target: node, color: node.color });
@@ -505,135 +293,54 @@ export default function MindMapTool() {
     setHoveredNodeId(id);
   }, []);
 
-  const handleResetView = useCallback(() => {
-    setTransform({ x: 0, y: 0, scale: 1 });
-  }, []);
-
-  const handleZoomIn = useCallback(() => {
-    setTransform((prev) => ({ ...prev, scale: Math.min(prev.scale * 1.3, 3) }));
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setTransform((prev) => ({ ...prev, scale: Math.max(prev.scale / 1.3, 0.3) }));
-  }, []);
-
-  // Mouse wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setTransform((prev) => ({
-      ...prev,
-      scale: Math.max(0.3, Math.min(prev.scale * delta, 3)),
-    }));
-  }, []);
-
-  // Drag to pan
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.target === svgRef.current || (e.target as Element)?.closest('svg') === svgRef.current) {
-      setIsDragging(true);
-      dragStart.current = { x: e.clientX - transform.x, y: e.clientY - transform.y };
-    }
-  }, [transform.x, transform.y]);
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (isDragging) {
-        setTransform((prev) => ({
-          ...prev,
-          x: e.clientX - dragStart.current.x,
-          y: e.clientY - dragStart.current.y,
-        }));
-      }
-    },
-    [isDragging],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
   const selectedNode = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null;
+
+  const handlePanUp = useCallback(() => {
+    setScrollY((prev) => Math.min(prev + 60, 200));
+  }, []);
+
+  const handlePanDown = useCallback(() => {
+    setScrollY((prev) => Math.max(prev - 60, -200));
+  }, []);
+
+  /* ---- Render ---- */
+
+  // Sort nodes so edges are drawn behind nodes
+  const sortedNodes = [...visibleNodes].sort((a, b) => b.level - a.level);
 
   return (
     <DenToolShell toolKey="mindmap" isLoading={isLoading} error={error} onRegenerate={regenerate}>
       {data && (
         <div className="flex flex-col gap-3">
-          {/* Canvas controls */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleZoomIn}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-                aria-label="Zoom in"
-                title="Zoom in"
-              >
-                <ZoomIn size={16} className="text-muted" />
-              </button>
-              <button
-                onClick={handleZoomOut}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-                aria-label="Zoom out"
-                title="Zoom out"
-              >
-                <ZoomOut size={16} className="text-muted" />
-              </button>
-              <button
-                onClick={handleResetView}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-                aria-label="Reset view"
-                title="Reset view"
-              >
-                <RotateCcw size={16} className="text-muted" />
-              </button>
-              <span className="text-[10px] text-muted-lighter ml-1">
-                {Math.round(transform.scale * 100)}% · Drag to pan · Scroll to zoom
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-muted-lighter">
-              <Info size={12} />
-              <span>Click category to collapse/expand · Click any node for details</span>
-            </div>
-          </div>
-
           {/* SVG Canvas */}
-          <div
-            className="glass-card p-0 overflow-hidden relative"
-            style={{ minHeight: 500, cursor: isDragging ? 'grabbing' : 'grab' }}
-          >
+          <div className="glass-card p-0 overflow-hidden relative rounded-xl" style={{ minHeight: 520 }}>
             <svg
               ref={svgRef}
-              viewBox="0 0 1000 700"
+              viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
               className="w-full h-auto"
               style={{ minHeight: 500 }}
-              onWheel={handleWheel}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
             >
-              <g
-                transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}
-                style={{ transformOrigin: `${CENTER_X}px ${CENTER_Y}px` }}
-              >
-                {/* Background grid */}
-                <defs>
-                  <pattern id="mindmap-grid" width={40} height={40} patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth={0.5} />
-                  </pattern>
-                  <filter id="glow">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
-                    <feMerge>
-                      <feMergeNode in="blur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
-                <rect width="1000" height="700" fill="url(#mindmap-grid)" />
+              <defs>
+                <filter id="glow-mindmap">
+                  <feGaussianBlur stdDeviation="4" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              <g transform={`translate(0, ${scrollY})`}>
+                {/* Subtle grid */}
+                <rect width={CANVAS_W} height={CANVAS_H} fill="transparent" />
 
                 {/* Edges */}
                 {edges.map((edge, i) => {
-                  const isHighlighted = highlightedId && (edge.source.id === highlightedId || edge.target.id === highlightedId);
-                  const isConnected = connectedIds.has(edge.source.id) && connectedIds.has(edge.target.id);
+                  const isHighlighted =
+                    highlightedId &&
+                    (edge.source.id === highlightedId || edge.target.id === highlightedId);
+                  const isConnected =
+                    connectedIds.has(edge.source.id) && connectedIds.has(edge.target.id);
                   return (
                     <MindMapEdge
                       key={`edge-${i}`}
@@ -644,45 +351,193 @@ export default function MindMapTool() {
                       color={edge.color}
                       isHighlighted={!!isHighlighted}
                       isConnected={isConnected}
-                      dashArray={edge.target.level === 2 ? '4,3' : undefined}
+                      dashArray={edge.target.level === 2 ? '5,3' : undefined}
                     />
                   );
                 })}
 
                 {/* Nodes */}
-                {visibleNodes.map((node) => {
-                  const isCenter = node.id === 'center';
+                {sortedNodes.map((node) => {
+                  const isCenter = node.level === 0;
+                  const isBranch = node.level === 1;
                   const isCollapsed = collapsed.has(node.id);
                   const isExpanded = !isCollapsed;
-                  const childCount = node.childIds.length;
+                  const hasChildren = node.childIds.length > 0;
+                  const isHighlighted = node.id === highlightedId;
+                  const isConnected = connectedIds.has(node.id);
+                  const isSelected = selectedNodeId === node.id;
 
-                  const visibleChildren = node.childIds.filter((cid) => visibleNodeIds.has(cid) && !collapsed.has(cid));
+                  const pillW = NODE_WIDTH;
+                  const pillH = NODE_HEIGHT;
+                  const rx = 14;
+                  const alpha = isHighlighted ? 1 : isConnected ? 0.85 : isCollapsed || !hasChildren ? 0.6 : 0.75;
+                  const isCollapsible = hasChildren && isBranch;
 
                   return (
-                    <MindMapNode
+                    <g
                       key={node.id}
-                      node={node}
-                      isCenter={isCenter}
-                      isCollapsed={isCollapsed}
-                      isExpanded={isExpanded}
-                      collapsedChildCount={node.childIds.length - visibleChildren.length}
-                      isHighlighted={node.id === highlightedId}
-                      isConnected={connectedIds.has(node.id)}
-                      isSelected={selectedNodeId === node.id}
-                      animated={animated}
-                      onToggle={handleToggle}
-                      onSelect={handleSelect}
-                      onHover={handleHover}
-                    />
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (hasChildren && !isCenter) {
+                          handleToggle(node.id);
+                        } else {
+                          handleSelect(node.id);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (hasChildren && !isCenter) {
+                            handleToggle(node.id);
+                          } else {
+                            handleSelect(node.id);
+                          }
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${isCenter ? 'Root' : isBranch ? 'Category' : 'Topic'}: ${node.label}${isCollapsed ? ', collapsed' : ''}`}
+                      aria-expanded={hasChildren ? !isCollapsed : undefined}
+                      onMouseEnter={() => handleHover(node.id)}
+                      onMouseLeave={() => handleHover(null)}
+                      className="cursor-pointer"
+                      style={{ transitionDelay: animated ? '50ms' : '0ms' }}
+                    >
+                      {/* Center node = larger rounded rect */}
+                      {isCenter ? (
+                        <>
+                          {/* Outer glow ring when selected */}
+                          {isSelected && (
+                            <rect
+                              x={node.x - pillW / 2 - 5}
+                              y={node.y - pillH / 2 - 5}
+                              width={pillW + 10}
+                              height={pillH + 10}
+                              rx={rx + 2}
+                              fill="none"
+                              stroke={node.color}
+                              strokeWidth={2}
+                              opacity={0.5}
+                              filter="url(#glow-mindmap)"
+                            />
+                          )}
+                          <rect
+                            x={node.x - pillW / 2}
+                            y={node.y - pillH / 2}
+                            width={pillW}
+                            height={pillH}
+                            rx={rx}
+                            fill={node.color}
+                            opacity={0.25}
+                            stroke={node.color}
+                            strokeWidth={1.5}
+                          />
+                          <text
+                            x={node.x}
+                            y={node.y + 5}
+                            textAnchor="middle"
+                            fill="white"
+                            fontSize="14"
+                            fontWeight="bold"
+                            className="pointer-events-none select-none"
+                          >
+                            {node.label.length > 24 ? node.label.slice(0, 24) + '…' : node.label}
+                          </text>
+                        </>
+                      ) : (
+                        <>
+                          {/* NotebookLM-style pill */}
+                          <rect
+                            x={node.x - pillW / 2}
+                            y={node.y - pillH / 2}
+                            width={pillW}
+                            height={pillH}
+                            rx={rx}
+                            fill={isSelected ? '#1e1b4b' : '#1e1b4b'}
+                            fillOpacity={isSelected ? 0.9 : 0.7}
+                            stroke={
+                              isSelected
+                                ? node.color
+                                : isHighlighted
+                                  ? node.color
+                                  : 'rgba(99, 102, 241, 0.25)' // indigo-500/30
+                            }
+                            strokeWidth={isSelected ? 2 : isHighlighted ? 1.5 : 1}
+                            className="transition-all duration-200"
+                            style={{
+                              backdropFilter: 'blur(12px)',
+                              WebkitBackdropFilter: 'blur(12px)',
+                            }}
+                          />
+
+                          {/* Label */}
+                          <text
+                            x={isCollapsible ? node.x - 8 : node.x}
+                            y={node.y + 4}
+                            textAnchor={isCollapsible ? 'end' : 'middle'}
+                            fill="white"
+                            fontSize={isBranch ? 12 : 11}
+                            fontWeight={isHighlighted || isSelected ? 'bold' : 'normal'}
+                            className="pointer-events-none select-none transition-all duration-200"
+                          >
+                            {node.label.length > 20 ? node.label.slice(0, 20) + '…' : node.label}
+                          </text>
+
+                          {/* Expand/collapse arrow for collapsible nodes */}
+                          {hasChildren && isBranch && (
+                            <g transform={`translate(${node.x + pillW / 2 - 16}, ${node.y})`}>
+                              <circle cx={0} cy={0} r={10} fill="rgba(99,102,241,0.15)" stroke="rgba(99,102,241,0.3)" strokeWidth={0.5} />
+                              {isCollapsed ? (
+                                <ChevronRight size={12} className="text-indigo-300" style={{ transform: 'translate(-6px, -6px)' }} />
+                              ) : (
+                                <ChevronDown size={12} className="text-indigo-300" style={{ transform: 'translate(-6px, -6px)' }} />
+                              )}
+                            </g>
+                          )}
+
+                          {/* Child count badge when collapsed */}
+                          {isCollapsed && node.childIds.length > 0 && (
+                            <g transform={`translate(${node.x + pillW / 2 - 16}, ${node.y - pillH / 2 - 10})`}>
+                              <rect x={-14} y={-8} width={28} height={16} rx={8} fill={node.color} opacity={0.9} />
+                              <text x={0} y={4} textAnchor="middle" fill="white" fontSize="9" fontWeight="bold" className="pointer-events-none select-none">
+                                +{node.childIds.length}
+                              </text>
+                            </g>
+                          )}
+                        </>
+                      )}
+                    </g>
                   );
                 })}
               </g>
             </svg>
 
-            {/* Detail panel overlaid */}
+            {/* Canvas Controls — Top Left Pill */}
+            <div className="absolute top-3 left-3 flex flex-col gap-1 bg-[#0f0a2e]/90 backdrop-blur-md border border-indigo-500/20 rounded-xl p-1.5 shadow-lg">
+              <button onClick={handlePanUp} className="p-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer" aria-label="Pan up" title="Pan up">
+                <ArrowUp size={14} className="text-indigo-300" />
+              </button>
+              <button onClick={handlePanDown} className="p-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer" aria-label="Pan down" title="Pan down">
+                <ArrowDown size={14} className="text-indigo-300" />
+              </button>
+              <div className="w-full h-px bg-indigo-500/20 my-0.5" />
+              <button onClick={() => setScrollY(0)} className="p-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors cursor-pointer" aria-label="Reset view" title="Reset view">
+                <RotateCcw size={14} className="text-indigo-300" />
+              </button>
+            </div>
+
+            {/* Detail panel overlaid at bottom */}
             {selectedNode && selectedNode.id !== 'center' && (
-              <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-72">
-                <DetailPanel node={selectedNode} onClose={() => setSelectedNodeId(null)} />
+              <div className="absolute bottom-3 left-3 right-3 md:left-auto md:right-3 md:w-72">
+                <DetailPanel
+                  node={selectedNode}
+                  parentLabel={
+                    selectedNode.parentId
+                      ? nodes.find((n) => n.id === selectedNode.parentId)?.label
+                      : undefined
+                  }
+                  onClose={() => setSelectedNodeId(null)}
+                />
               </div>
             )}
           </div>
