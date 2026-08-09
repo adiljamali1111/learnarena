@@ -27,7 +27,7 @@ export default function MyUniverseView() {
         <div className="flex-1 min-w-0 w-full lg:w-auto">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center shadow-glow-cyan-sm">
                 <Library size={20} className="text-accent" />
               </div>
               <div>
@@ -96,7 +96,9 @@ export default function MyUniverseView() {
           <div
             key={mod.id}
             className={`glass-card p-4 group hover:border-accent/40 transition-all ${
-              mod.id === state.activeModuleId ? 'border-accent/40 bg-accent/5' : ''
+              mod.id === state.activeModuleId
+                ? 'border-accent/50 bg-accent/5 shadow-glow-cyan-sm'
+                : ''
             }`}
           >
             <div className="flex items-start justify-between mb-3">

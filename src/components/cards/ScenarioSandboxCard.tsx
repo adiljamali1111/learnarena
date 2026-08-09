@@ -35,7 +35,7 @@ export default function ScenarioSandboxCard({ data, onRefresh }: Props) {
     <div className="glass-card p-6 flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-xl bg-warning/20 flex items-center justify-center">
+        <div className="w-9 h-9 rounded-xl bg-warning/20 flex items-center justify-center shadow-glow-purple-sm">
           <FlaskConical size={18} className="text-warning" />
         </div>
         <h3 className="font-heading font-semibold text-lg flex-1">Scenario Sandbox</h3>
@@ -55,6 +55,9 @@ export default function ScenarioSandboxCard({ data, onRefresh }: Props) {
           </button>
         )}
       </div>
+
+      {/* Neon divider */}
+      <div className="h-px bg-gradient-to-r from-warning/40 via-accent/20 to-transparent mb-4" />
 
       {/* Scenario */}
       <h4 className="text-sm font-semibold text-glow-cyan mb-2 break-words">{data.title}</h4>

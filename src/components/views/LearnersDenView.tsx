@@ -33,7 +33,7 @@ export default function LearnersDenView() {
     <div className="p-4 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center shadow-glow-cyan-sm">
           <Sparkles size={20} className="text-accent" />
         </div>
         <div>

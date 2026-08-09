@@ -78,7 +78,7 @@ export default function DashboardView() {
       {/* Module header */}
       <div className="flex items-center justify-between mb-6 animate-fade-in-up">
         <div className="min-w-0">
-          <h2 className="font-heading font-bold text-2xl truncate">{dashboard.moduleTitle}</h2>
+          <h2 className="font-heading font-bold text-2xl truncate text-glow-purple">{dashboard.moduleTitle}</h2>
           <p className="text-xs text-muted-lighter mt-1">
             {activeModule.notes.length.toLocaleString()} chars •{' '}
             {dashboard.coreConcepts.length} concepts •{' '}
@@ -118,8 +118,7 @@ export default function DashboardView() {
             onRefresh={refreshDiagnosticQuestions}
           />
         </div>
-
-        </div>
+      </div>
     </div>
   );
 }

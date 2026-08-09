@@ -9,6 +9,7 @@ import MyUniverseView from './components/views/MyUniverseView';
 import PracticeDuelView from './components/views/PracticeDuelView';
 import LearnersDenView from './components/views/LearnersDenView';
 import DenToolView from './components/views/DenToolView';
+import NeonLogo from './components/NeonLogo';
 import {
   LayoutDashboard,
   Library,
@@ -33,17 +34,22 @@ function Header() {
   const activeModule = state.modules.find((m) => m.id === state.activeModuleId);
 
   return (
-    <header className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between backdrop-blur-xl bg-dark-base/60 border-b border-glass-border">
+    <header className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between backdrop-blur-xl bg-dark-base/60 border-b border-glass-border relative">
+      {/* Neon accent line at bottom of header */}
+      <div className="absolute bottom-0 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
       {/* Left — brand (clicking navigates to dashboard) */}
       <button
         onClick={() => setActiveTab('dashboard')}
         className="flex items-center gap-3 group cursor-pointer transition-all"
       >
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-glow-purple-sm group-hover:shadow-glow-purple transition-shadow">
-          <span className="text-sm">🧠</span>
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-dark-card to-dark-elevated border border-primary/40 flex items-center justify-center shadow-glow-purple-sm group-hover:shadow-glow-purple transition-all group-hover:border-accent/40">
+          <NeonLogo size={22} />
         </div>
-        <div className="hidden sm:block">
-          <h1 className="font-heading font-bold text-sm text-glow-cyan group-hover:text-glow transition-colors">LearnArena</h1>
+        <div className="hidden sm:block text-left">
+          <h1 className="font-heading font-bold text-sm leading-tight">
+            <span className="text-primary-light text-glow-purple">Learn</span>
+            <span className="text-accent text-glow-cyan">Arena</span>
+          </h1>
           {activeModule && (
             <p className="text-[10px] text-muted-lighter truncate max-w-[160px]">
               {activeModule.title}
@@ -65,8 +71,8 @@ function Header() {
               onClick={() => setActiveTab(tab.key)}
               className={`pill-tab flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                 isActive
-                  ? 'bg-primary/20 text-primary shadow-sm'
-                  : 'text-muted hover:text-foreground'
+                  ? 'bg-primary/20 text-primary shadow-glow-purple-sm border border-primary/30'
+                  : 'text-muted hover:text-foreground border border-transparent'
               }`}
             >
               <Icon size={14} />

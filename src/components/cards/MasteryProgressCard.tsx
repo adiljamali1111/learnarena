@@ -12,11 +12,14 @@ export default function MasteryProgressCard({ data }: Props) {
   return (
     <div className="glass-card p-6">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-xl bg-gold/20 flex items-center justify-center">
+        <div className="w-9 h-9 rounded-xl bg-gold/20 flex items-center justify-center shadow-glow-purple-sm">
           <BarChart3 size={18} className="text-gold" />
         </div>
         <h3 className="font-heading font-semibold text-lg">Mastery Progress</h3>
       </div>
+
+      {/* Neon divider */}
+      <div className="h-px bg-gradient-to-r from-gold/40 via-accent/20 to-transparent mb-4" />
 
       {/* XP Bar */}
       <div className="mb-4">
@@ -31,7 +34,7 @@ export default function MasteryProgressCard({ data }: Props) {
         </div>
         <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-700"
+            className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-700 shadow-glow-cyan-sm"
             style={{ width: `${progressPercent}%` }}
           />
         </div>

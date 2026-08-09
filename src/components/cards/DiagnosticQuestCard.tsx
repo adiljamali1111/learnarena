@@ -70,7 +70,7 @@ export default function DiagnosticQuestCard({ data, moduleId, onXpGained, onRefr
     <div className="glass-card p-5">
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-8 h-8 rounded-xl bg-success/20 flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-xl bg-success/20 flex items-center justify-center shrink-0 shadow-glow-purple-sm">
           <ClipboardCheck size={16} className="text-success" />
         </div>
         <div className="flex-1 min-w-0">

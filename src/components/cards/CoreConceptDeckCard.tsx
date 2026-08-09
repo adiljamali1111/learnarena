@@ -15,7 +15,7 @@ export default function CoreConceptDeckCard({ data }: Props) {
   return (
     <div className="glass-card p-6 flex flex-col">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-xl bg-accent/20 flex items-center justify-center">
+        <div className="w-9 h-9 rounded-xl bg-accent/20 flex items-center justify-center shadow-glow-cyan-sm">
           <BookOpen size={18} className="text-accent" />
         </div>
         <div className="flex-1">
@@ -25,6 +25,9 @@ export default function CoreConceptDeckCard({ data }: Props) {
           </p>
         </div>
       </div>
+
+      {/* Neon divider */}
+      <div className="h-px bg-gradient-to-r from-accent/40 via-primary/20 to-transparent mb-4" />
 
       <div className="flex-1 flex flex-col min-w-0">
         <h4 className="text-lg font-bold text-glow-purple mb-2 break-words">{current.term}</h4>
@@ -48,7 +51,7 @@ export default function CoreConceptDeckCard({ data }: Props) {
         <button
           onClick={() => setIndex((i) => Math.max(0, i - 1))}
           disabled={index === 0}
-          className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="p-2 rounded-lg bg-white/5 hover:bg-accent/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer hover:shadow-glow-cyan-sm"
         >
           <ChevronLeft size={16} />
         </button>
@@ -59,7 +62,7 @@ export default function CoreConceptDeckCard({ data }: Props) {
               key={i}
               onClick={() => setIndex(i)}
               className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                i === index ? 'bg-accent w-4' : 'bg-white/20 hover:bg-white/40'
+                i === index ? 'bg-accent w-4 shadow-glow-cyan-sm' : 'bg-white/20 hover:bg-white/40'
               }`}
             />
           ))}
@@ -68,7 +71,7 @@ export default function CoreConceptDeckCard({ data }: Props) {
         <button
           onClick={() => setIndex((i) => Math.min(data.length - 1, i + 1))}
           disabled={index === data.length - 1}
-          className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="p-2 rounded-lg bg-white/5 hover:bg-accent/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer hover:shadow-glow-cyan-sm"
         >
           <ChevronRight size={16} />
         </button>
