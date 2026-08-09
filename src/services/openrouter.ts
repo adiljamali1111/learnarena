@@ -33,11 +33,47 @@ function getAuthHeaders(apiKey: string): Record<string, string> {
   };
 }
 
+/**
+ * Robustly extract a JSON value from an LLM response.
+ * Handles markdown code fences (```json ... ```) and stray prose
+ * the model may add around the JSON payload.
+ */
+function extractJson<T>(raw: string): T {
+  let text = raw.trim();
+
+  // Strip markdown code fences: ```json ... ``` or ``` ... ```
+  const fenceMatch = text.match(/^```[a-zA-Z]*\s*([\s\S]*?)```\s*$/);
+  if (fenceMatch) {
+    text = fenceMatch[1].trim();
+  } else {
+    // Cut leading prose up to the first { or [
+    const firstBrace = text.indexOf('{');
+    const firstBracket = text.indexOf('[');
+    let start = -1;
+    if (firstBrace === -1) start = firstBracket;
+    else if (firstBracket === -1) start = firstBrace;
+    else start = Math.min(firstBrace, firstBracket);
+    if (start > 0) text = text.slice(start);
+
+    // Cut trailing prose after the last } or ]
+    const lastBrace = text.lastIndexOf('}');
+    const lastBracket = text.lastIndexOf(']');
+    let end = -1;
+    if (lastBrace === -1) end = lastBracket;
+    else if (lastBracket === -1) end = lastBrace;
+    else end = Math.max(lastBrace, lastBracket);
+    if (end !== -1 && end < text.length - 1) text = text.slice(0, end + 1);
+  }
+
+  return JSON.parse(text) as T;
+}
+
 async function apiCall<T>(
   apiKey: string,
   systemPrompt: string,
   userMessage: string,
   imageDataUrls?: string[],
+  maxTokens = 4000,
 ): Promise<T> {
   const messages: { role: string; content: unknown }[] = [
     { role: 'system', content: systemPrompt },
@@ -61,7 +97,7 @@ async function apiCall<T>(
       model: MODEL,
       messages,
       response_format: { type: 'json_object' },
-      max_tokens: 4000,
+      max_tokens: maxTokens,
       temperature: 0.7,
     }),
   });
@@ -92,7 +128,7 @@ async function apiCall<T>(
   }
 
   try {
-    return JSON.parse(content) as T;
+    return extractJson<T>(content);
   } catch {
     throw new OpenRouterError(
       'Failed to parse LLM response as JSON',
@@ -300,6 +336,15 @@ export async function generateScenario(
   );
 }
 
+const DEN_MAX_TOKENS: Record<string, number> = {
+  audio: 6000,
+  mindmap: 4000,
+  presentation: 6000,
+  recall: 6000,
+  visual: 6000,
+  report: 16000, // study guide — large output (20 MCQs + long-form answers + glossary)
+};
+
 export async function generateDenContent<T>(
   apiKey: string,
   toolKey: string,
@@ -311,5 +356,7 @@ export async function generateDenContent<T>(
     apiKey,
     systemPrompt,
     `Generate content for the ${toolKey} tool from these notes:\n\n${notes}`,
+    undefined,
+    DEN_MAX_TOKENS[toolKey] || 8000,
   );
 }
