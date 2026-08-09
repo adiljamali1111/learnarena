@@ -4,17 +4,90 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/nativelyai.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LearnArena — Interactive Study Dashboard</title>
-    <meta name="description" content="Transform raw course notes into an immersive learning universe. Paste notes, upload files, and get structured study tools — quizzes, flip cards, mind maps, and more." />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" crossorigin="anonymous" />
-    <meta property="og:title" content="LearnArena — Interactive Study Dashboard" />
-    <meta property="og:description" content="Transform raw course notes into an immersive learning universe." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="LearnArena — Interactive Study Dashboard" />
-    <meta name="twitter:description" content="Transform raw course notes into an immersive learning universe." />
+    <meta name="description" content="LearnArena — Turn raw notes into a living study universe" />
+    <meta property="og:title" content="LearnArena" />
+    <meta property="og:description" content="Turn raw notes into a living study universe" />
+    <!-- Fonts inlined to avoid cross-origin stylesheet that breaks html-to-image's cssRules access -->
+    <style>
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-style: normal;
+        font-weight: 300;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8lqxjPQ.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPQ.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8-qxjPQ.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8FqtjPQ.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8L6tjPQ.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Orbitron';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/orbitron/v35/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nyGy6xpg.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Orbitron';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/orbitron/v35/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nyKS6xpg.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Orbitron';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/orbitron/v35/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nyxSmxpg.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Orbitron';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/orbitron/v35/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1ny_Cmxpg.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Orbitron';
+        font-style: normal;
+        font-weight: 800;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/orbitron/v35/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nymymxpg.ttf) format('truetype');
+      }
+      @font-face {
+        font-family: 'Orbitron';
+        font-style: normal;
+        font-weight: 900;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/orbitron/v35/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nysimxpg.ttf) format('truetype');
+      }
+    </style>
+    <title>LearnArena</title>
   </head>
   <body>
     <div id="root"></div>

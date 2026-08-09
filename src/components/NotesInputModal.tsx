@@ -1,215 +1,197 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, X, AlertCircle, Sparkles } from 'lucide-react';
-import { validateFiles, parseFile, ParsedFile, FileParseError } from '../services/fileParser';
-import { FILE_LIMITS } from '../constants';
+import { FileText, Upload, X, File, AlertCircle } from 'lucide-react';
+import { useDashboard } from '../context/DashboardContext';
 
-interface NotesInputModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (text: string, images: string[], noteContent: string) => void;
-  onTryDemo: () => void;
-  isGenerating: boolean;
-  error?: string;
-}
+const ACCEPTED_TYPES = '.pdf,.docx,.pptx,.txt,.md';
+const MAX_FILES = 6;
 
-export default function NotesInputModal({ isOpen, onClose, onSubmit, onTryDemo, isGenerating, error }: NotesInputModalProps) {
-  const [textInput, setTextInput] = useState('');
-  const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([]);
-  const [errors, setErrors] = useState<FileParseError[]>([]);
-  const [isParsing, setIsParsing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropRef = useRef<HTMLDivElement>(null);
+export default function NotesInputModal() {
+  const { setModal, generateFromNotes } = useDashboard();
+  const [notes, setNotes] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [dragActive, setDragActive] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleFiles = useCallback(async (newFiles: FileList | File[]) => {
-    const fileArray = Array.from(newFiles);
-    const { valid, errors: validationErrors } = validateFiles(fileArray);
-    setErrors(validationErrors);
-
-    if (valid.length === 0) return;
-
-    setIsParsing(true);
-
-    try {
-      const results = await Promise.allSettled(valid.map(parseFile));
-      const parsed: ParsedFile[] = [];
-      const parseErrors: FileParseError[] = [];
-
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        if (result.status === 'fulfilled') {
-          parsed.push(result.value);
-        } else {
-          parseErrors.push({
-            fileName: valid[i].name,
-            error: result.reason?.message || 'Failed to parse file',
-          });
-        }
-      }
-
-      setParsedFiles((prev) => [...prev, ...parsed]);
-      setErrors((prev) => [...prev, ...parseErrors]);
-    } finally {
-      setIsParsing(false);
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
     }
   }, []);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      if (e.dataTransfer.files.length > 0) {
-        handleFiles(e.dataTransfer.files);
-      }
-    },
-    [handleFiles]
-  );
-
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(
+      (f) =>
+        f.name.match(/\.(pdf|docx|pptx|txt|md)$/i) && f.size <= 15 * 1024 * 1024,
+    );
+    setFiles((prev) => {
+      const combined = [...prev, ...droppedFiles].slice(0, MAX_FILES);
+      return combined;
+    });
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    setFiles((prev) => {
+      const combined = [...prev, ...selected].slice(0, MAX_FILES);
+      return combined;
+    });
+    if (e.target) e.target.value = '';
   };
 
   const removeFile = (index: number) => {
-    setParsedFiles((prev) => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = () => {
-    const allText = [
-      textInput,
-      ...parsedFiles.map((pf) => `--- ${pf.fileName} ---\n${pf.text}`),
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+  const handleSubmit = async () => {
+    const trimmedNotes = notes.trim();
+    if (!trimmedNotes && files.length === 0) return;
 
-    const allImages = parsedFiles.flatMap((pf) => pf.images).slice(0, 10);
-
-    if (!allText.trim()) return;
-
-    onSubmit(allText, allImages, textInput || parsedFiles[0]?.fileName || 'Untitled');
+    setIsSubmitting(true);
+    await generateFromNotes(trimmedNotes, files.length > 0 ? files : undefined);
+    setIsSubmitting(false);
   };
 
-  if (!isOpen) return null;
+  const hasContent = notes.trim().length > 0 || files.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-overlay animate-fade-in">
-      <div className="dark-glass rounded-xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto animate-scale-in">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="font-heading text-xl text-text-primary">Import Your Notes</h2>
-          <button onClick={onClose} className="glass-button-ghost p-2 rounded-lg" disabled={isGenerating}>
-            <X size={20} />
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-2xl p-6 relative animate-fade-in-up max-h-[90vh] flex flex-col">
+        {/* Close */}
+        <button
+          onClick={() => setModal('none')}
+          className="absolute top-4 right-4 text-muted hover:text-foreground transition-colors cursor-pointer"
+          aria-label="Close"
+        >
+          <X size={20} />
+        </button>
+
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4 sm:mb-6">
+          <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center shrink-0">
+            <FileText className="text-accent" size={20} />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-heading font-bold text-lg truncate">New Study Module</h2>
+            <p className="text-xs text-muted truncate">
+              Paste your notes or upload course materials
+            </p>
+          </div>
         </div>
 
-        {/* Error banner */}
-        {error && (
-          <div className="mb-6 p-4 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm flex items-start gap-3">
-            <AlertCircle size={18} className="mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium mb-1">Generation failed</p>
-              <p>{error}</p>
-              <p className="mt-2 text-text-muted">
-                Try pasting different text, or use the demo below to explore the app right away.
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto min-h-0 space-y-3 sm:space-y-4">
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Paste your notes here... (or upload files below)"
+            className="w-full min-h-[120px] sm:min-h-[160px] px-4 py-3 rounded-xl bg-white/5 border border-glass-border text-foreground placeholder-muted-lighter font-mono text-sm focus:outline-none focus:border-accent transition-colors resize-none"
+          />
+
+          {/* File drop zone */}
+          <div
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-xl p-3 sm:p-4 text-center transition-colors cursor-pointer ${
+              dragActive
+                ? 'drop-zone-active'
+                : 'border-glass-border hover:border-accent/40'
+            }`}
+            onClick={() => inputRef.current?.click()}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept={ACCEPTED_TYPES}
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Upload
+              size={20}
+              className={`mx-auto mb-1 sm:mb-2 ${dragActive ? 'text-accent' : 'text-muted-lighter'}`}
+            />
+            <p className="text-xs sm:text-sm text-muted">
+              {dragActive
+                ? 'Drop files here'
+                : 'Drop files or click to upload'}
+            </p>
+            <p className="text-[10px] sm:text-xs text-muted-lighter mt-1">
+              PDF, DOCX, PPTX, TXT, MD (max 15MB, up to {MAX_FILES} files)
+            </p>
+          </div>
+
+          {/* File list */}
+          {files.length > 0 && (
+            <div className="space-y-1.5 max-h-[100px] overflow-y-auto">
+              {files.map((file, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 text-sm"
+                >
+                  <File size={14} className="text-accent shrink-0" />
+                  <span className="text-foreground truncate flex-1">{file.name}</span>
+                  <span className="text-muted-lighter text-xs shrink-0">
+                    {(file.size / 1024).toFixed(0)} KB
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(i);
+                    }}
+                    className="text-muted hover:text-destructive transition-colors cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Warning */}
+          {!hasContent && (
+            <div className="flex items-start gap-2 text-xs text-warning">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" />
+              <p>
+                Paste some notes or upload at least one file to generate your dashboard.
               </p>
             </div>
-          </div>
-        )}
-
-        {/* Text paste area */}
-        <div className="mb-6">
-          <label className="text-text-secondary text-sm mb-2 block">Paste your notes here</label>
-          <textarea
-            value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            placeholder="Paste lecture notes, study material, or any text content..."
-            className="glass-input w-full h-32 resize-none p-4 text-sm"
-            disabled={isGenerating}
-          />
+          )}
         </div>
 
-        {/* Divider */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 h-px bg-border-glass" />
-          <span className="text-text-muted text-xs font-heading">OR</span>
-          <div className="flex-1 h-px bg-border-glass" />
-        </div>
-
-        {/* File upload */}
-        <div
-          ref={dropRef}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          className="border-2 border-dashed border-border-glass rounded-xl p-8 text-center cursor-pointer
-            hover:border-primary/50 hover:bg-bg-card-hover transition-all duration-200"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload size={36} className="mx-auto mb-3 text-text-muted" />
-          <p className="text-text-secondary text-sm mb-1">
-            Drop files here or click to browse
-          </p>
-          <p className="text-text-muted text-xs">
-            PDF, DOCX, PPTX, TXT, MD — up to {FILE_LIMITS.maxFiles} files, {FILE_LIMITS.maxSizeMB}MB total
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".pdf,.docx,.pptx,.txt,.md"
-            className="hidden"
-            onChange={(e) => e.target.files && handleFiles(e.target.files)}
-            disabled={isGenerating}
-          />
-        </div>
-
-        {/* File list */}
-        {parsedFiles.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {parsedFiles.map((pf, i) => (
-              <div key={i} className="flex items-center gap-3 bg-bg-elevated rounded-lg p-3">
-                <FileText size={18} className="text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-text-primary text-sm truncate">{pf.fileName}</p>
-                  <p className="text-text-muted text-xs">
-                    {pf.text.length} chars · {pf.images.length} images
-                  </p>
-                </div>
-                <button
-                  onClick={() => removeFile(i)}
-                  className="glass-button-ghost p-1 rounded shrink-0"
-                  disabled={isGenerating}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Errors */}
-        {errors.length > 0 && (
-          <div className="mt-4 space-y-1">
-            {errors.map((e, i) => (
-              <div key={i} className="flex items-start gap-2 text-danger text-xs">
-                <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                <span>{e.fileName}: {e.error}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Submit buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 mt-6">
+        {/* Actions — pinned to bottom */}
+        <div className="flex gap-3 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-glass-border shrink-0">
           <button
-            onClick={handleSubmit}
-            disabled={(!textInput.trim() && parsedFiles.length === 0) || isGenerating || isParsing}
-            className="glass-button flex-1 py-3 font-heading tracking-wider"
+            onClick={() => setModal('none')}
+            className="btn-base flex-1 py-2.5 sm:py-3 rounded-xl bg-white/5 text-muted hover:text-foreground hover:bg-white/10 transition-colors"
           >
-            {isGenerating || isParsing ? 'Processing...' : 'GENERATE STUDY UNIVERSE'}
+            Cancel
           </button>
           <button
-            onClick={onTryDemo}
-            disabled={isGenerating}
-            className="glass-button-ghost px-5 py-3 font-heading tracking-wider text-sm flex items-center justify-center gap-2"
+            onClick={handleSubmit}
+            disabled={!hasContent || isSubmitting}
+            className="btn-base flex-1 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold hover:shadow-glow-purple transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Sparkles size={16} />
-            TRY DEMO
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Generating...
+              </span>
+            ) : (
+              'Generate Dashboard'
+            )}
           </button>
         </div>
       </div>
