@@ -1,160 +1,17 @@
 import DenToolShell from '../den/DenToolShell';
+import MindMapTool from '../den/MindMapTool';
+import AudioOverviewTool from '../den/AudioOverviewTool';
 import { useDenTool } from '../den/useDenTool';
 import type {
-  AudioOverviewData,
   MindMapData,
   PresentationData,
   RecallCardsData,
   VisualBreakdownData,
   StudyReportData,
 } from '../../types/dashboard';
-import MindMapTool from '../den/MindMapTool';
-import { Play, Pause, Square, FileDown, Loader2 } from 'lucide-react';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { FileDown, Loader2 } from 'lucide-react';
+import { useState, useRef, useCallback } from 'react';
 import { useDashboard } from '../../context/DashboardContext';
-
-/* ===========================
-   Audio Overview Tool
-   =========================== */
-function AudioOverviewTool() {
-  const { data, isLoading, error, regenerate } = useDenTool<AudioOverviewData>('audio');
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentSegment, setCurrentSegment] = useState(-1);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-
-  useEffect(() => {
-    synthRef.current = window.speechSynthesis;
-    return () => {
-      if (synthRef.current) synthRef.current.cancel();
-    };
-  }, []);
-
-  const speakSegment = useCallback((segments: { heading: string; text: string }[], idx: number) => {
-    if (!synthRef.current) return;
-    synthRef.current.cancel();
-    if (idx >= segments.length) {
-      setIsPlaying(false);
-      setCurrentSegment(-1);
-      return;
-    }
-    const seg = segments[idx];
-    const utterance = new SpeechSynthesisUtterance(`${seg.heading}: ${seg.text}`);
-    utterance.rate = 0.9;
-    utterance.pitch = 1.1;
-    utterance.onend = () => {
-      setCurrentSegment((prev) => {
-        const next = prev + 1;
-        if (next < segments.length) {
-          speakSegment(segments, next);
-        } else {
-          setIsPlaying(false);
-        }
-        return next < segments.length ? next : -1;
-      });
-    };
-    utteranceRef.current = utterance;
-    setCurrentSegment(idx);
-    setIsPlaying(true);
-    synthRef.current.speak(utterance);
-  }, []);
-
-  const handlePlayPause = () => {
-    if (!data) return;
-    if (isPlaying) {
-      if (synthRef.current) synthRef.current.pause();
-      setIsPlaying(false);
-    } else if (currentSegment >= 0) {
-      if (synthRef.current) synthRef.current.resume();
-      setIsPlaying(true);
-    } else {
-      speakSegment(data.segments, 0);
-    }
-  };
-
-  const handleStop = () => {
-    if (synthRef.current) synthRef.current.cancel();
-    setIsPlaying(false);
-    setCurrentSegment(-1);
-  };
-
-  return (
-    <DenToolShell toolKey="audio" isLoading={isLoading} error={error} onRegenerate={regenerate}>
-      {data && (
-        <div className="space-y-4">
-          {/* Narration card */}
-          <div className="glass-card p-6">
-            <p className="text-sm text-foreground/80 leading-relaxed mb-4">{data.script}</p>
-          </div>
-
-          {/* Audio player controls */}
-          <div className="glass-card p-4 flex items-center gap-3">
-            <button
-              onClick={handlePlayPause}
-              className="w-10 h-10 rounded-full bg-primary flex items-center justify-center hover:shadow-glow-purple transition-all cursor-pointer"
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-            >
-              {isPlaying ? <Pause size={18} className="text-white" /> : <Play size={18} className="text-white" />}
-            </button>
-
-            <button
-              onClick={handleStop}
-              disabled={currentSegment < 0}
-              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 disabled:opacity-30 transition-all cursor-pointer"
-              aria-label="Stop"
-            >
-              <Square size={16} className="text-muted" />
-            </button>
-
-            <div className="flex-1">
-              <div className="flex gap-1.5">
-                {data.segments.map((seg, i) => (
-                  <div
-                    key={i}
-                    className={`flex-1 h-1.5 rounded-full transition-all ${
-                      i < currentSegment
-                        ? 'bg-accent'
-                        : i === currentSegment
-                          ? 'bg-primary animate-pulse'
-                          : 'bg-white/10'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <span className="text-xs text-muted-lighter shrink-0">
-              {currentSegment >= 0
-                ? `${currentSegment + 1}/${data.segments.length}`
-                : `${data.segments.length} segments`}
-            </span>
-          </div>
-
-          {/* Segment list */}
-          <div className="space-y-2">
-            {data.segments.map((seg, i) => (
-              <button
-                key={i}
-                onClick={() => { handleStop(); speakSegment(data.segments, i); }}
-                className={`w-full text-left glass-card p-4 transition-all cursor-pointer ${
-                  i === currentSegment ? 'border-accent/40 bg-accent/5' : ''
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] text-primary font-bold">
-                    {i + 1}
-                  </span>
-                  <h4 className="text-sm font-semibold text-foreground">{seg.heading}</h4>
-                </div>
-                <p className="text-xs text-muted line-clamp-2">{seg.text}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </DenToolShell>
-  );
-}
 
 /* ===========================
    Presentation Tool
