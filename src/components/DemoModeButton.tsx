@@ -19,7 +19,7 @@ export default function DemoModeButton({ size = 'md' }: { size?: 'md' | 'lg' }) 
     >
       <span className="flex items-center justify-center gap-2">
         <Zap size={isLarge ? 18 : 16} />
-        <span>{isLarge ? 'Try Demo Mode (No API Key Required)' : 'Try Demo Mode (No API Key Required)'}</span>
+        <span>Try Demo Mode (No API Key Required)</span>
       </span>
     </button>
   );

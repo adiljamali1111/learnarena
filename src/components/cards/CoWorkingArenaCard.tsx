@@ -1,4 +1,4 @@
-import { Trophy, Zap, Medal, Crown } from 'lucide-react';
+import { Trophy, Zap, Medal, Crown, Flame } from 'lucide-react';
 import type { LeaderboardEntry } from '../../constants/demoData';
 
 interface Props {
