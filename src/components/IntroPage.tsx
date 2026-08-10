@@ -1,6 +1,5 @@
 import { useDashboard } from '../context/DashboardContext';
 import NeonLogo from './NeonLogo';
-import DemoModeButton from './DemoModeButton';
 
 export default function IntroPage() {
   const { setModal } = useDashboard();
@@ -76,11 +75,6 @@ export default function IntroPage() {
           <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse-glow" />
           <span className="relative">Get Started</span>
         </button>
-
-        {/* Demo mode */}
-        <div className="mt-4">
-          <DemoModeButton size="lg" />
-        </div>
 
         <p className="text-xs text-muted-lighter mt-6">
           Bring your own OpenRouter API key • Everything stays in your browser

@@ -3,7 +3,6 @@ import { Key, X, Check } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 import { PROVIDER_CONFIG } from '../services/aiService';
 import type { AIProvider } from '../types/dashboard';
-import DemoModeButton from './DemoModeButton';
 
 const PROVIDER_ORDER: AIProvider[] = ['openrouter', 'aimlapi'];
 
@@ -211,16 +210,6 @@ export default function ApiKeyModal() {
             Get a {config.label} key
           </a>
         </p>
-
-        {/* Demo mode divider */}
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-glass-border" />
-          <span className="text-[10px] text-muted-lighter uppercase tracking-wider">or</span>
-          <div className="flex-1 h-px bg-glass-border" />
-        </div>
-
-        {/* Try Demo Mode */}
-        <DemoModeButton />
       </div>
     </div>
   );
