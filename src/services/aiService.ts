@@ -37,11 +37,11 @@ export const PROVIDER_CONFIG: Record<AIProvider, ProviderConfig> = {
     label: 'AI/ML API',
     shortLabel: 'AIML API',
     baseUrl: 'https://api.aimlapi.com/v1/chat/completions',
-    defaultModel: 'google/gemma-3-4b-it',
+    defaultModel: 'gpt-4o-mini',
     keyLink: 'https://aimlapi.com/keys',
     keyPlaceholder: 'sk-...',
     description:
-      'Affordable OpenAI-compatible API with a range of open models. Defaults to the lightweight Google Gemma 3 4B.',
+      'Affordable OpenAI-compatible API. The default is the same fast GPT-4o mini used on OpenRouter for consistent results.',
   },
 };
 
