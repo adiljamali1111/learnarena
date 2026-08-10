@@ -317,6 +317,7 @@ export interface Notification {
 
 export interface AppState {
   hasEntered: boolean;
+  isDemoMode: boolean;
   apiKey: string;
   provider: AIProvider;
   apiKeyError: string | null;

@@ -31,6 +31,11 @@ import {
   clearSeenForModule,
 } from '../services/questionBank';
 import { clearDocumentImages } from '../services/documentContext';
+import {
+  DEMO_DASHBOARD_DATA,
+  DEMO_MASTERY_PROGRESS,
+  DEMO_DEN_TOOL_DATA,
+} from '../constants/demoData';
 
 /* ===========================
    Constants
@@ -39,6 +44,21 @@ const STORAGE_KEY = 'learnarena_state';
 const API_KEY_KEY = 'learnarena_api_key';
 const PROVIDER_KEY = 'learnarena_provider';
 const HIGH_SCORE_KEY = 'learnarena_high_score';
+const DEMO_MODE_KEY = 'learnarena_demo_mode';
+const DEMO_API_KEY = 'demo_mode_key';
+const DEMO_MODULE_ID = 'mod-demo';
+
+const DEMO_NOTES = `DNA Extraction & Polymerase Chain Reaction (PCR)
+
+DNA extraction is the first step in almost every molecular biology workflow. The goal is to isolate pure, high-molecular-weight DNA from cells and tissues. The classic organic method uses a lysis buffer containing SDS detergent and proteinase K to break open cells and digest histone proteins, followed by phenol:chloroform:isoamyl alcohol (25:24:1) extraction to partition proteins into the organic phase while DNA stays in the aqueous phase. DNA is then precipitated with ice-cold ethanol or isopropanol in the presence of salt (Na+ or NH4+), pelleted by centrifugation, washed with 70% ethanol, and resuspended in TE buffer or nuclease-free water.
+
+Silica column-based kits are a faster, safer alternative: DNA binds to a silica membrane in high-salt conditions and elutes in low-salt buffer or water. Quality is assessed by spectrophotometry (A260/A280 ratio 1.8-2.0) or fluorometry (e.g. Qubit).
+
+PCR amplifies a specific DNA target exponentially. A typical reaction contains template DNA, forward and reverse primers (18-24 nt, 40-60% GC, Tm 55-65C), dNTPs (200 uM each), MgCl2 (1.5-4 mM), Taq DNA polymerase, and reaction buffer. The thermocycler repeats 25-35 cycles of: denaturation at 94C (strands separate), annealing at 50-65C (primers bind), and extension at 72C (Taq synthesizes new strands at ~1000 nt/min). Each cycle doubles the target, giving ~10^9-fold amplification after 30 cycles.
+
+Real-time PCR (qPCR) adds fluorescent reporters (SYBR Green or TaqMan probes) to measure amplification in real time; the Cq value is inversely proportional to starting template quantity. PCR products are typically verified by agarose gel electrophoresis, where smaller fragments migrate faster through the gel matrix.
+
+Applications include forensic STR typing (multiplex PCR at 16+ loci), pathogen diagnostics, cloning, gene expression analysis, and sequencing library preparation. Common troubleshooting issues include primer-dimers, non-specific smears (lower annealing temperature), and no product (degraded template, inhibitors, or incorrect Tm).`;
 
 const INITIAL_DUEL: DuelState = {
   phase: 'idle',
@@ -70,6 +90,7 @@ interface DashboardContextValue {
   setApiKey: (key: string) => void;
   setProvider: (provider: AIProvider) => void;
   setApiKeyError: (error: string | null) => void;
+  loadDemoData: () => void;
   generateFromNotes: (notes: string, files?: File[]) => Promise<void>;
   resetDashboard: () => void;
   saveCurrentModule: () => void;
@@ -145,6 +166,7 @@ function createInitialState(): AppState {
   const apiKey = localStorage.getItem(API_KEY_KEY) || '';
   return {
     hasEntered: !!apiKey,
+    isDemoMode: apiKey === DEMO_API_KEY,
     apiKey,
     provider: loadProvider(),
     apiKeyError: null,
@@ -185,6 +207,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const key = localStorage.getItem(API_KEY_KEY) || '';
     initial.apiKey = key;
     initial.hasEntered = !!key;
+    initial.isDemoMode = key === DEMO_API_KEY;
     initial.provider = loadProvider();
     initial.apiKeyError = null;
     return initial;
@@ -213,14 +236,75 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const setApiKey = useCallback((key: string) => {
     localStorage.setItem(API_KEY_KEY, key);
+    localStorage.removeItem(DEMO_MODE_KEY);
     saveState((s) => ({
       ...s,
       apiKey: key,
+      isDemoMode: false,
       hasEntered: true,
       modal: key ? 'notesInput' : 'apiKey',
       apiKeyError: null,
     }));
   }, [saveState]);
+
+  /**
+   * Load the built-in demo universe ("DNA Extraction & PCR") so users can
+   * explore LearnArena without an API key. Seeds the module dashboard, the
+   * den-tool caches, marks demo mode, and drops the user straight into the
+   * Dashboard tab.
+   */
+  const loadDemoData = useCallback(() => {
+    // Seed den-tool mock content so useDenTool serves it from cache
+    // without any API call.
+    try {
+      Object.entries(DEMO_DEN_TOOL_DATA).forEach(([toolKey, content]) => {
+        localStorage.setItem(
+          `learnarena_den_cache_${toolKey}_${DEMO_MODULE_ID}`,
+          JSON.stringify(content),
+        );
+      });
+    } catch {
+      // localStorage may be full — the dashboards still work
+    }
+
+    const now = Date.now();
+    const demoModule: ModuleData = {
+      id: DEMO_MODULE_ID,
+      title: DEMO_DASHBOARD_DATA.moduleTitle,
+      notes: DEMO_NOTES,
+      images: [],
+      dashboard: DEMO_DASHBOARD_DATA,
+      createdAt: now,
+      updatedAt: now,
+      xp: DEMO_MASTERY_PROGRESS.totalXp,
+    };
+
+    // A placeholder key keeps hasEntered true and den-tool hooks happy.
+    localStorage.setItem(API_KEY_KEY, DEMO_API_KEY);
+    localStorage.setItem(DEMO_MODE_KEY, 'true');
+
+    saveState((s) => ({
+      ...s,
+      hasEntered: true,
+      isDemoMode: true,
+      apiKey: DEMO_API_KEY,
+      apiKeyError: null,
+      activeModuleId: DEMO_MODULE_ID,
+      modules: [demoModule],
+      activeTab: 'dashboard',
+      modal: 'none',
+      isLoading: false,
+      error: null,
+      activeDenTool: null,
+      documentImages: [],
+    }));
+
+    addNotification({
+      type: 'achievement',
+      message: 'Loaded Demo Universe: DNA Extraction & PCR',
+      read: false,
+    });
+  }, [saveState, addNotification]);
 
   const setProvider = useCallback(
     (provider: AIProvider) => {
@@ -766,6 +850,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setApiKey,
     setProvider,
     setApiKeyError,
+    loadDemoData,
     generateFromNotes,
     resetDashboard,
     saveCurrentModule,

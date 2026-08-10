@@ -19,6 +19,15 @@ import {
 
 type PlayEngine = 'speechmatics' | 'browser' | null;
 
+const RATE_OPTIONS = [0.75, 1, 1.25, 1.5] as const;
+
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export default function AudioOverviewTool() {
   const { data, isLoading, error, regenerate } = useDenTool<AudioOverviewData>('audio');
 
@@ -31,6 +40,9 @@ export default function AudioOverviewTool() {
   const [currentSegment, setCurrentSegment] = useState(-1);
   const [engine, setEngine] = useState<PlayEngine>(null);
   const [lastFallback, setLastFallback] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   /* ---- Refs ---- */
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -43,6 +55,9 @@ export default function AudioOverviewTool() {
   /* Keep current data in ref so callbacks stay fresh without re-creating them. */
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
+
+  const rateRef = useRef(playbackRate);
+  rateRef.current = playbackRate;
 
   /* ---- Init speechSynthesis ---- */
   useEffect(() => {
@@ -72,6 +87,7 @@ export default function AudioOverviewTool() {
     setIsPlaying(false);
     setIsPreparing(false);
     setCurrentSegment(-1);
+    setCurrentTime(0);
     setEngine(null);
   }, []);
 
@@ -92,7 +108,7 @@ export default function AudioOverviewTool() {
       const utterance = new SpeechSynthesisUtterance(
         `${seg.heading}: ${seg.text}`,
       );
-      utterance.rate = 0.92;
+      utterance.rate = rateRef.current;
       utterance.pitch = 1.05;
       utterance.volume = 1;
 
@@ -161,12 +177,15 @@ export default function AudioOverviewTool() {
       if (cached) {
         /* Play cached audio */
         setCurrentSegment(idx);
+        setCurrentTime(0);
+        setDuration(0);
         setIsPlaying(true);
         setIsPreparing(false);
         setEngine('speechmatics');
         setLastFallback(false);
         if (audioRef.current) {
           audioRef.current.src = cached;
+          audioRef.current.playbackRate = rateRef.current;
           await audioRef.current.play().catch(() => {
             /* If play fails, fall back to browser */
             speakWithBrowser(segments, idx);
@@ -185,12 +204,15 @@ export default function AudioOverviewTool() {
         }
         cacheRef.current.set(cacheKey, result.url);
         setCurrentSegment(idx);
+        setCurrentTime(0);
+        setDuration(0);
         setIsPlaying(true);
         setIsPreparing(false);
         setEngine('speechmatics');
         setLastFallback(false);
         if (audioRef.current) {
           audioRef.current.src = result.url;
+          audioRef.current.playbackRate = rateRef.current;
           await audioRef.current.play().catch(() => {
             speakWithBrowser(segments, idx);
           });
@@ -275,6 +297,17 @@ export default function AudioOverviewTool() {
     setVoice(newVoice);
   };
 
+  const handleRateChange = (rate: number) => {
+    setPlaybackRate(rate);
+    if (audioRef.current) audioRef.current.playbackRate = rate;
+  };
+
+  const handleSeek = (value: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = value;
+    setCurrentTime(value);
+  };
+
   /* ---- Memoised voice options ---- */
   const voiceOptions = useMemo(() => TTS_VOICES, []);
 
@@ -293,6 +326,8 @@ export default function AudioOverviewTool() {
             ref={audioRef}
             onEnded={handleAudioEnded}
             onError={handleAudioError}
+            onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
             className="hidden"
             preload="none"
           />
@@ -306,8 +341,8 @@ export default function AudioOverviewTool() {
 
           {/* Audio player controls */}
           <div className="glass-card p-4 space-y-3">
-            {/* Top row: voice picker + engine badge */}
-            <div className="flex items-center justify-between gap-3">
+            {/* Top row: voice picker + speed + engine badge */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               {/* Voice selector */}
               <div className="flex items-center gap-2">
                 <Mic size={14} className="text-muted-lighter shrink-0" />
@@ -325,25 +360,67 @@ export default function AudioOverviewTool() {
                 </select>
               </div>
 
-              {/* Engine badge */}
-              {engine && (
-                <div
-                  className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full transition-all ${
-                    engine === 'speechmatics'
-                      ? 'bg-accent/10 text-accent border border-accent/20'
-                      : 'bg-warning/10 text-warning border border-warning/20'
-                  }`}
-                >
-                  {engine === 'speechmatics' ? (
-                    <Wifi size={10} aria-hidden="true" />
-                  ) : (
-                    <WifiOff size={10} aria-hidden="true" />
-                  )}
-                  <span>
-                    {engine === 'speechmatics' ? 'Speechmatics' : 'Browser voice'}
+              <div className="flex items-center gap-2.5">
+                {/* Speed selector */}
+                <div className="flex items-center gap-1.5">
+                  <span id="speed-label" className="text-[10px] text-muted-lighter">
+                    Speed
                   </span>
+                  <select
+                    value={playbackRate}
+                    onChange={(e) => handleRateChange(Number(e.target.value))}
+                    aria-labelledby="speed-label"
+                    className="appearance-none bg-white/10 text-foreground text-xs rounded-xl px-2.5 py-1.5 border border-glass-border focus:outline-none focus:border-accent/50 cursor-pointer transition-all"
+                  >
+                    {RATE_OPTIONS.map((r) => (
+                      <option key={r} value={r} className="bg-dark-surface text-foreground">
+                        {r}×
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
+
+                {/* Engine badge */}
+                {engine && (
+                  <div
+                    className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full transition-all ${
+                      engine === 'speechmatics'
+                        ? 'bg-accent/10 text-accent border border-accent/20'
+                        : 'bg-warning/10 text-warning border border-warning/20'
+                    }`}
+                  >
+                    {engine === 'speechmatics' ? (
+                      <Wifi size={10} aria-hidden="true" />
+                    ) : (
+                      <WifiOff size={10} aria-hidden="true" />
+                    )}
+                    <span>
+                      {engine === 'speechmatics' ? 'Speechmatics' : 'Browser voice'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Scrub bar */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-muted-lighter tabular-nums w-8 shrink-0 text-right">
+                {formatTime(currentTime)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(duration, 1)}
+                step={0.1}
+                value={Math.min(currentTime, duration || 0)}
+                onChange={(e) => handleSeek(Number(e.target.value))}
+                disabled={engine !== 'speechmatics' || duration <= 0}
+                aria-label="Seek playback position"
+                className="flex-1 min-w-0 accent-primary cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              />
+              <span className="text-[10px] text-muted-lighter tabular-nums w-8 shrink-0">
+                {formatTime(duration)}
+              </span>
             </div>
 
             {/* Bottom row: transport controls + progress */}

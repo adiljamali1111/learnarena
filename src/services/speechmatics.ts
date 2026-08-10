@@ -10,10 +10,8 @@ const PUBLISHABLE_KEY = 'sb_publishable_RxI6BYNR_EgcWj5V7mWRoQ_jnx_aj_1';
 const TTS_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/speechmatics-tts`;
 
 export const TTS_VOICES = [
-  { id: 'sarah', label: 'Sarah', detail: 'English (UK) · female', emoji: '🇬🇧' },
-  { id: 'theo', label: 'Theo', detail: 'English (UK) · male', emoji: '🇬🇧' },
-  { id: 'megan', label: 'Megan', detail: 'English (UK) · female', emoji: '🇬🇧' },
-  { id: 'jack', label: 'Jack', detail: 'English (US) · male', emoji: '🇺🇸' },
+  { id: 'sarah', label: 'Sarah', detail: 'English (UK) · female (default)', emoji: '🇬🇧' },
+  { id: 'megan', label: 'Megan', detail: 'English (US) · female', emoji: '🇺🇸' },
 ] as const;
 
 export type TTSVoiceId = (typeof TTS_VOICES)[number]['id'];
@@ -46,11 +44,7 @@ export async function synthesizeSpeech(
       'Content-Type': 'application/json',
       apikey: PUBLISHABLE_KEY,
     },
-    body: JSON.stringify({
-      text,
-      voice,
-      output_format: 'wav_16000',
-    }),
+    body: JSON.stringify({ text, voice }),
   });
 
   if (!response.ok) {
