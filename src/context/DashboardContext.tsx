@@ -247,6 +247,55 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }));
   }, [saveState]);
 
+  const setProvider = useCallback(
+    (provider: AIProvider) => {
+      localStorage.setItem(PROVIDER_KEY, provider);
+      saveState((s) => ({ ...s, provider, apiKeyError: null }));
+    },
+    [saveState],
+  );
+
+  const setApiKeyError = useCallback(
+    (error: string | null) => {
+      saveState((s) => ({ ...s, apiKeyError: error }));
+    },
+    [saveState],
+  );
+
+  /* ===========================
+     Notifications — defined early because loadDemoData depends on them
+     =========================== */
+  const addNotification = useCallback(
+    (n: Omit<Notification, 'id' | 'timestamp'>) => {
+      const notification: Notification = {
+        ...n,
+        id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: Date.now(),
+      };
+      saveState((s) => ({
+        ...s,
+        notifications: [notification, ...s.notifications].slice(0, 50),
+      }));
+    },
+    [saveState],
+  );
+
+  const clearNotifications = useCallback(() => {
+    saveState((s) => ({ ...s, notifications: [] }));
+  }, [saveState]);
+
+  const markNotificationRead = useCallback(
+    (id: string) => {
+      saveState((s) => ({
+        ...s,
+        notifications: s.notifications.map((n) =>
+          n.id === id ? { ...n, read: true } : n,
+        ),
+      }));
+    },
+    [saveState],
+  );
+
   /**
    * Load the built-in demo universe ("DNA Extraction & PCR") so users can
    * explore LearnArena without an API key. Seeds the module dashboard, the
@@ -306,21 +355,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     });
   }, [saveState, addNotification]);
 
-  const setProvider = useCallback(
-    (provider: AIProvider) => {
-      localStorage.setItem(PROVIDER_KEY, provider);
-      saveState((s) => ({ ...s, provider, apiKeyError: null }));
-    },
-    [saveState],
-  );
-
-  const setApiKeyError = useCallback(
-    (error: string | null) => {
-      saveState((s) => ({ ...s, apiKeyError: error }));
-    },
-    [saveState],
-  );
-
   /**
    * Inspect an AI-service error. If the key was rejected (401) it opens the
    * API-key modal with provider-specific feedback; otherwise it just returns
@@ -339,40 +373,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       }
       if (err instanceof Error) return err.message;
       return 'Something went wrong';
-    },
-    [saveState],
-  );
-
-  /* ===========================
-     Notifications
-     =========================== */
-  const addNotification = useCallback(
-    (n: Omit<Notification, 'id' | 'timestamp'>) => {
-      const notification: Notification = {
-        ...n,
-        id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        timestamp: Date.now(),
-      };
-      saveState((s) => ({
-        ...s,
-        notifications: [notification, ...s.notifications].slice(0, 50),
-      }));
-    },
-    [saveState],
-  );
-
-  const clearNotifications = useCallback(() => {
-    saveState((s) => ({ ...s, notifications: [] }));
-  }, [saveState]);
-
-  const markNotificationRead = useCallback(
-    (id: string) => {
-      saveState((s) => ({
-        ...s,
-        notifications: s.notifications.map((n) =>
-          n.id === id ? { ...n, read: true } : n,
-        ),
-      }));
     },
     [saveState],
   );
