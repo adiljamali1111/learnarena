@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { generateDenContent, OpenRouterError } from '../../services/openrouter';
+import {
+  generateDenContent,
+  AIServiceError,
+} from '../../services/aiService';
 import { useDashboard } from '../../context/DashboardContext';
 
 const CACHE_PREFIX = 'learnarena_den_cache_';
@@ -12,7 +15,7 @@ interface UseDenToolResult<T> {
 }
 
 export function useDenTool<T>(toolKey: string): UseDenToolResult<T> {
-  const { state } = useDashboard();
+  const { state, setModal, setApiKeyError } = useDashboard();
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +55,7 @@ export function useDenTool<T>(toolKey: string): UseDenToolResult<T> {
       try {
         const content = await generateDenContent<T>(
           state.apiKey,
+          state.provider,
           toolKey,
           activeModule.notes,
         );
@@ -64,16 +68,27 @@ export function useDenTool<T>(toolKey: string): UseDenToolResult<T> {
         setData(content);
       } catch (err) {
         const msg =
-          err instanceof OpenRouterError
+          err instanceof AIServiceError
             ? err.message
             : err instanceof Error
               ? err.message
               : 'Failed to generate content';
 
+        // A rejected key can't be fixed by retrying — surface the modal instead
+        if (err instanceof AIServiceError && err.code === 'invalid_key') {
+          setError('Your API key was rejected. Re-enter it in settings.');
+          setModal('apiKey');
+          setApiKeyError(
+            'Your API key was rejected (401). Check the key and try again.',
+          );
+          return;
+        }
+
         // Retry once
         try {
           const content = await generateDenContent<T>(
             state.apiKey,
+            state.provider,
             toolKey,
             activeModule.notes,
           );
@@ -91,7 +106,7 @@ export function useDenTool<T>(toolKey: string): UseDenToolResult<T> {
         setIsLoading(false);
       }
     },
-    [activeModule, state.apiKey, toolKey],
+    [activeModule, state.apiKey, state.provider, toolKey, setModal, setApiKeyError],
   );
 
   useEffect(() => {

@@ -289,6 +289,17 @@ export interface StudyReportData {
 }
 
 /* ===========================
+   AI Provider Types
+   =========================== */
+
+export type AIProvider = 'openrouter' | 'aimlapi';
+
+export const AI_PROVIDER_OPTIONS: { key: AIProvider; label: string }[] = [
+  { key: 'openrouter', label: 'OpenRouter' },
+  { key: 'aimlapi', label: 'AI/ML API' },
+];
+
+/* ===========================
    UI / App State
    =========================== */
 
@@ -307,6 +318,8 @@ export interface Notification {
 export interface AppState {
   hasEntered: boolean;
   apiKey: string;
+  provider: AIProvider;
+  apiKeyError: string | null;
   activeModuleId: string | null;
   modules: ModuleData[];
   activeTab: TabKey;

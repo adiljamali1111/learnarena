@@ -15,9 +15,17 @@ import type {
   Notification,
   DenToolKey,
   DocumentImage,
+  AIProvider,
 } from '../types/dashboard';
 import { getComboMultiplier, getComboLevel } from '../types/dashboard';
-import { generateDashboard, generateDiagnosticQuestions, generateFreshQuestions, generateScenario } from '../services/openrouter';
+import {
+  generateDashboard,
+  generateDiagnosticQuestions,
+  generateFreshQuestions,
+  generateScenario,
+  AIServiceError,
+  PROVIDER_CONFIG,
+} from '../services/aiService';
 import { parseMultipleFiles } from '../services/fileParser';
 import {
   clearSeenForModule,
@@ -28,7 +36,8 @@ import { clearDocumentImages } from '../services/documentContext';
    Constants
    =========================== */
 const STORAGE_KEY = 'learnarena_state';
-const API_KEY_KEY = 'learnarena_openrouter_key';
+const API_KEY_KEY = 'learnarena_api_key';
+const PROVIDER_KEY = 'learnarena_provider';
 const HIGH_SCORE_KEY = 'learnarena_high_score';
 
 const INITIAL_DUEL: DuelState = {
@@ -59,6 +68,8 @@ interface DashboardContextValue {
   setActiveTab: (tab: TabKey) => void;
   setModal: (modal: ModalType) => void;
   setApiKey: (key: string) => void;
+  setProvider: (provider: AIProvider) => void;
+  setApiKeyError: (error: string | null) => void;
   generateFromNotes: (notes: string, files?: File[]) => Promise<void>;
   resetDashboard: () => void;
   saveCurrentModule: () => void;
@@ -113,11 +124,30 @@ function loadHighScore(): number {
   }
 }
 
+function loadProvider(): AIProvider {
+  try {
+    const p = localStorage.getItem(PROVIDER_KEY);
+    if (p === 'openrouter' || p === 'aimlapi') return p;
+  } catch {
+    // ignore
+  }
+  return 'openrouter';
+}
+
+function getCredentials(): { apiKey: string; provider: AIProvider } {
+  return {
+    apiKey: localStorage.getItem(API_KEY_KEY) || '',
+    provider: loadProvider(),
+  };
+}
+
 function createInitialState(): AppState {
   const apiKey = localStorage.getItem(API_KEY_KEY) || '';
   return {
     hasEntered: !!apiKey,
     apiKey,
+    provider: loadProvider(),
+    apiKeyError: null,
     activeModuleId: null,
     modules: [],
     activeTab: 'dashboard',
@@ -151,10 +181,12 @@ function persistState(state: AppState): void {
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(() => {
     const initial = loadState();
-    // Restore apiKey from separate storage
+    // Restore apiKey and provider from separate storage
     const key = localStorage.getItem(API_KEY_KEY) || '';
     initial.apiKey = key;
     initial.hasEntered = !!key;
+    initial.provider = loadProvider();
+    initial.apiKeyError = null;
     return initial;
   });
 
@@ -186,8 +218,46 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       apiKey: key,
       hasEntered: true,
       modal: key ? 'notesInput' : 'apiKey',
+      apiKeyError: null,
     }));
   }, [saveState]);
+
+  const setProvider = useCallback(
+    (provider: AIProvider) => {
+      localStorage.setItem(PROVIDER_KEY, provider);
+      saveState((s) => ({ ...s, provider, apiKeyError: null }));
+    },
+    [saveState],
+  );
+
+  const setApiKeyError = useCallback(
+    (error: string | null) => {
+      saveState((s) => ({ ...s, apiKeyError: error }));
+    },
+    [saveState],
+  );
+
+  /**
+   * Inspect an AI-service error. If the key was rejected (401) it opens the
+   * API-key modal with provider-specific feedback; otherwise it just returns
+   * a human-readable message.
+   */
+  const handleAiError = useCallback(
+    (err: unknown): string => {
+      if (err instanceof AIServiceError && err.code === 'invalid_key') {
+        const label = PROVIDER_CONFIG[err.provider]?.label || 'AI';
+        saveState((s) => ({
+          ...s,
+          modal: 'apiKey',
+          apiKeyError: `Your ${label} API key was rejected (401). Check the key and try again.`,
+        }));
+        return `Your ${label} API key was rejected. Open settings to re-enter it.`;
+      }
+      if (err instanceof Error) return err.message;
+      return 'Something went wrong';
+    },
+    [saveState],
+  );
 
   /* ===========================
      Notifications
@@ -247,14 +317,21 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        const apiKey = localStorage.getItem(API_KEY_KEY);
+        const { apiKey, provider } = getCredentials();
         if (!apiKey) {
-          throw new Error('API key not found');
+          saveState((s) => ({
+            ...s,
+            isLoading: false,
+            modal: 'apiKey',
+            apiKeyError: 'No API key found — add your key to get started.',
+          }));
+          return;
         }
 
         const imageDataUrls = images.map((img) => img.dataUrl);
         const dashboard = await generateDashboard(
           apiKey,
+          provider,
           finalNotes,
           imageDataUrls.length > 0 ? imageDataUrls : undefined,
         );
@@ -289,8 +366,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           read: false,
         });
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to generate dashboard';
+        const message = handleAiError(err);
         saveState((s) => ({
           ...s,
           isLoading: false,
@@ -299,7 +375,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         addNotification({ type: 'error', message, read: false });
       }
     },
-    [saveState, addNotification],
+    [saveState, addNotification, handleAiError],
   );
 
   const resetDashboard = useCallback(() => {
@@ -396,13 +472,26 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }));
 
     try {
-      const apiKey = localStorage.getItem(API_KEY_KEY);
+      const { apiKey, provider } = getCredentials();
       const activeModule = state.modules.find(
         (m) => m.id === state.activeModuleId,
       );
-      if (!apiKey || !activeModule) throw new Error('No module or API key');
+      if (!apiKey) {
+        saveState((s) => ({
+          ...s,
+          duel: { ...s.duel, phase: 'idle' },
+          modal: 'apiKey',
+          apiKeyError: 'No API key found — add your key to start a duel.',
+        }));
+        return;
+      }
+      if (!activeModule) throw new Error('No module selected');
 
-      const questions = await generateFreshQuestions(apiKey, activeModule.notes);
+      const questions = await generateFreshQuestions(
+        apiKey,
+        provider,
+        activeModule.notes,
+      );
 
       saveState((s) => ({
         ...s,
@@ -454,15 +543,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
       }, 1000);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to start duel';
+      const message = handleAiError(err);
       saveState((s) => ({
         ...s,
         duel: { ...s.duel, phase: 'idle' },
         error: message,
       }));
     }
-  }, [saveState, state.modules, state.activeModuleId]);
+  }, [saveState, state.modules, state.activeModuleId, handleAiError]);
 
   const answerDuelQuestion = useCallback(
     (index: number) => {
@@ -574,7 +662,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
      Diagnostic Refresh
      =========================== */
   const refreshDiagnosticQuestions = useCallback(async () => {
-    const apiKey = localStorage.getItem(API_KEY_KEY);
+    const { apiKey, provider } = getCredentials();
     const activeModule = state.modules.find(
       (m) => m.id === state.activeModuleId,
     );
@@ -583,6 +671,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     try {
       const newQuestions = await generateDiagnosticQuestions(
         apiKey,
+        provider,
         activeModule.notes,
       );
 
@@ -606,17 +695,16 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         read: false,
       });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to refresh questions';
+      const message = handleAiError(err);
       addNotification({ type: 'error', message, read: false });
     }
-  }, [saveState, addNotification, state.modules, state.activeModuleId]);
+  }, [saveState, addNotification, state.modules, state.activeModuleId, handleAiError]);
 
   /* ===========================
      Scenario Refresh
      =========================== */
   const refreshScenario = useCallback(async () => {
-    const apiKey = localStorage.getItem(API_KEY_KEY);
+    const { apiKey, provider } = getCredentials();
     const activeModule = state.modules.find(
       (m) => m.id === state.activeModuleId,
     );
@@ -625,6 +713,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     try {
       const newScenario = await generateScenario(
         apiKey,
+        provider,
         activeModule.notes,
       );
 
@@ -648,11 +737,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         read: false,
       });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to refresh scenario';
+      const message = handleAiError(err);
       addNotification({ type: 'error', message, read: false });
     }
-  }, [saveState, addNotification, state.modules, state.activeModuleId]);
+  }, [saveState, addNotification, state.modules, state.activeModuleId, handleAiError]);
 
   /* ===========================
      Learner's Den
@@ -676,6 +764,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setActiveTab,
     setModal,
     setApiKey,
+    setProvider,
+    setApiKeyError,
     generateFromNotes,
     resetDashboard,
     saveCurrentModule,
