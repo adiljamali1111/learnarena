@@ -1,12 +1,8 @@
 import { useDashboard } from '../../context/DashboardContext';
 import ModuleSynthesisCard from '../cards/ModuleSynthesisCard';
 import CoreConceptDeckCard from '../cards/CoreConceptDeckCard';
-import ContextMapCard from '../cards/ContextMapCard';
-import CoWorkingArenaCard from '../cards/CoWorkingArenaCard';
 import ScenarioSandboxCard from '../cards/ScenarioSandboxCard';
 import DiagnosticQuestCard from '../cards/DiagnosticQuestCard';
-import MasteryProgressCard from '../cards/MasteryProgressCard';
-import { DEMO_LEADERBOARD } from '../../constants/demoData';
 import { Plus } from 'lucide-react';
 
 export default function DashboardView() {
@@ -108,31 +104,18 @@ export default function DashboardView() {
           <CoreConceptDeckCard data={dashboard.coreConcepts} />
         </div>
 
-        {/* Context Map */}
-        <div className="lg:col-span-2">
-          <ContextMapCard data={dashboard.contextMap} />
-        </div>
-
         {/* Scenario Sandbox — narrower for quick interaction */}
         <div className="lg:col-span-1">
           <ScenarioSandboxCard data={dashboard.scenario} onRefresh={refreshScenario} />
         </div>
 
         {/* Diagnostic Quest — wider so it reads like a real quiz card */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-1">
           <DiagnosticQuestCard
             data={dashboard.diagnosticQuestions}
             moduleId={activeModule.id}
             onRefresh={refreshDiagnosticQuestions}
           />
-        </div>
-
-        {/* Mastery Progress & CoWorking Arena — side by side on large screens */}
-        <div className="lg:col-span-1">
-          <MasteryProgressCard data={dashboard.masteryProgress} />
-        </div>
-        <div className="lg:col-span-2">
-          <CoWorkingArenaCard data={DEMO_LEADERBOARD} />
         </div>
       </div>
     </div>
