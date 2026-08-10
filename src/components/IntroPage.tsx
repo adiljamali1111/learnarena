@@ -1,5 +1,5 @@
 import { useDashboard } from '../context/DashboardContext';
-import NeonLogo from './NeonLogo';
+import LearnArenaLogo from './LearnArenaLogo';
 import DemoModeButton from './DemoModeButton';
 
 export default function IntroPage() {
@@ -20,9 +20,7 @@ export default function IntroPage() {
         <div className="mb-8 flex justify-center">
           <div className="relative">
             <div className="absolute inset-0 rounded-2xl bg-primary/20 blur-2xl scale-125 animate-pulse-glow pointer-events-none" />
-            <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-dark-card to-dark-elevated border border-primary/40 flex items-center justify-center shadow-glow-purple animate-float">
-              <NeonLogo size={64} />
-            </div>
+            <LearnArenaLogo size="lg" />
             {/* Corner neon accents */}
             <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-accent rounded-tl-md" />
             <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-accent rounded-tr-md" />

@@ -9,7 +9,7 @@ import MyUniverseView from './components/views/MyUniverseView';
 import PracticeDuelView from './components/views/PracticeDuelView';
 import LearnersDenView from './components/views/LearnersDenView';
 import DenToolView from './components/views/DenToolView';
-import NeonLogo from './components/NeonLogo';
+import LearnArenaLogo from './components/LearnArenaLogo';
 import {
   LayoutDashboard,
   Library,
@@ -43,9 +43,7 @@ function Header() {
         onClick={() => setActiveTab('dashboard')}
         className="flex items-center gap-3 group cursor-pointer transition-all"
       >
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-dark-card to-dark-elevated border border-primary/40 flex items-center justify-center shadow-glow-purple-sm group-hover:shadow-glow-purple transition-all group-hover:border-accent/40">
-          <NeonLogo size={22} />
-        </div>
+        <LearnArenaLogo size="sm" />
         <div className="hidden sm:block text-left">
           <h1 className="font-heading font-bold text-sm leading-tight">
             <span className="text-primary-light text-glow-purple">Learn</span>
