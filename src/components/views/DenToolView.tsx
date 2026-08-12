@@ -265,7 +265,9 @@ function VisualBreakdownTool() {
 async function downloadDocx(data: StudyReportData, moduleTitle: string) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, BorderStyle, WidthType } = await import('docx');
 
-  const children: (typeof Paragraph | typeof Table)[] = [];
+  // docx requires FileChild[] here; the generated content is built dynamically
+  // from mixed Paragraph/Table instances, so we use any[] to match the runtime shape.
+  const children: any[] = [];
 
   // Title
   children.push(
