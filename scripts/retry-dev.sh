@@ -1,16 +1,20 @@
 #!/bin/bash
 # Retry wrapper for Vite dev server — handles sandbox reprovisioning delay
-# Tries npx vite directly (not backgrounded) and retries if it fails to start.
+# Installs dependencies first, then retries starting Vite until it succeeds.
 # Once Vite is running, this stays alive with it.
 
 MAX_RETRIES=10
 RETRY_DELAY=3
 
+# First, ensure dependencies are installed
+echo "[retry-dev] Installing dependencies..."
+npm install --no-audit --no-fund 2>&1 | tail -5
+
 for i in $(seq 1 $MAX_RETRIES); do
   echo "[retry-dev] Attempt $i of $MAX_RETRIES..."
 
   # Run Vite in the foreground — if it starts successfully, this runs forever
-  # If the sandbox is provisioning, npx/vite exits immediately with non-zero
+  # If the sandbox is provisioning, Vite exits immediately with non-zero
   npx vite --host 0.0.0.0 --port 5173
 
   # If we get here, Vite exited (either failed to start or was killed)
