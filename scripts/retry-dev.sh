@@ -1,5 +1,7 @@
 #!/bin/bash
 # Retry wrapper for Vite dev server — handles sandbox reprovisioning delay
+# Tries npx vite directly (not backgrounded) and retries if it fails to start.
+# Once Vite is running, this stays alive with it.
 
 MAX_RETRIES=10
 RETRY_DELAY=3
@@ -7,21 +9,20 @@ RETRY_DELAY=3
 for i in $(seq 1 $MAX_RETRIES); do
   echo "[retry-dev] Attempt $i of $MAX_RETRIES..."
 
-  # Start vite in background
-  npx vite --host 0.0.0.0 --port 5173 &
-  VITE_PID=$!
+  # Run Vite in the foreground — if it starts successfully, this runs forever
+  # If the sandbox is provisioning, npx/vite exits immediately with non-zero
+  npx vite --host 0.0.0.0 --port 5173
 
-  # Give it a moment to either fail or start listening
-  sleep 2
+  # If we get here, Vite exited (either failed to start or was killed)
+  EXIT_CODE=$?
+  echo "[retry-dev] Vite exited with code $EXIT_CODE."
 
-  # Check if it's actually listening
-  if kill -0 "$VITE_PID" 2>/dev/null; then
-    # Process is still running — assume it started successfully
-    wait "$VITE_PID"
-    exit $?
+  # If it ran successfully and then got killed (exit code from signal), don't retry
+  if [ $EXIT_CODE -ge 128 ] && [ $EXIT_CODE -ne 255 ]; then
+    echo "[retry-dev] Vite was terminated (signal $((EXIT_CODE - 128))). Exiting."
+    exit $EXIT_CODE
   fi
 
-  # Vite exited early — sandbox was likely provisioning
   echo "[retry-dev] Sandbox not ready yet. Retrying in ${RETRY_DELAY}s..."
   sleep "$RETRY_DELAY"
 done
