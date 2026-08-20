@@ -38,6 +38,6 @@ export default defineConfig(() => ({
     port: 5173,
     allowedHosts: true as const,
     hmr: false,
-    strictPort: true,
+    strictPort: false,
   },
 }))
