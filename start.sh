@@ -15,31 +15,35 @@
 
 echo "[start.sh] Ensuring dependencies..."
 
-MAX_ATTEMPTS=5
-attempt=1
-installed=0
-while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-  echo "[start.sh] npm install attempt $attempt/$MAX_ATTEMPTS..."
-  if npm install --no-audit --no-fund > /tmp/start-npm-install.log 2>&1; then
-    echo "[start.sh] npm install succeeded"
-    installed=1
-    break
-  fi
-  echo "[start.sh] npm install failed (attempt $attempt/$MAX_ATTEMPTS), retrying in 2s..."
-  sleep 2
-  attempt=$((attempt + 1))
-done
+if [ -x node_modules/.bin/vite ]; then
+  echo "[start.sh] node_modules present, skipping npm install (fast boot)"
+else
+  MAX_ATTEMPTS=5
+  attempt=1
+  installed=0
+  while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+    echo "[start.sh] npm install attempt $attempt/$MAX_ATTEMPTS..."
+    if npm install --no-audit --no-fund > /tmp/start-npm-install.log 2>&1; then
+      echo "[start.sh] npm install succeeded"
+      installed=1
+      break
+    fi
+    echo "[start.sh] npm install failed (attempt $attempt/$MAX_ATTEMPTS), retrying in 2s..."
+    sleep 2
+    attempt=$((attempt + 1))
+  done
 
-if [ "$installed" -ne 1 ]; then
-  echo "[start.sh] npm install failed after $MAX_ATTEMPTS attempts"
-  tail -20 /tmp/start-npm-install.log
-  exit 1
+  if [ "$installed" -ne 1 ]; then
+    echo "[start.sh] npm install failed after $MAX_ATTEMPTS attempts"
+    tail -20 /tmp/start-npm-install.log
+    exit 1
+  fi
 fi
 
 echo "[start.sh] Starting Vite..."
 while true; do
   echo "[start.sh] Launching Vite at $(date)"
-  npx vite --host 0.0.0.0 --port 5173 --strictPort
+  ./node_modules/.bin/vite --host 0.0.0.0 --port 5173 --strictPort
   RC=$?
   echo "[start.sh] Vite exited with code $RC at $(date) — restarting in 2s"
   sleep 2
