@@ -38,6 +38,9 @@ export default defineConfig(() => ({
     port: 5173,
     allowedHosts: true as const,
     hmr: false,
-    strictPort: false,
+    // Fail loudly instead of silently drifting to 5174: the preview proxy
+    // always targets 5173, so a fallback port would leave the preview dead
+    // while vite reports "ready". strictPort makes ownership deterministic.
+    strictPort: true,
   },
 }))
